@@ -1,6 +1,11 @@
+import java.io.File
+
 plugins {
     id 'java-library'
 }
+
+project.version = '0.1-SNAPSHOT'
+project.group = 'com.nocmok'
 
 repositories {
     mavenCentral()
@@ -12,8 +17,33 @@ repositories {
 dependencies {
     testImplementation(platform('org.junit:junit-bom:5.7.0'))
 	testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation(name: 'gdal', ext: 'jar')
 }
 
 test {
     useJUnitPlatform()
 }
+
+task cleanupJni() {
+    def jniDir = file("${project.getBuildDir()}/jni")
+    if(jniDir.exists() && !jniDir.isDirectory()){
+        jniDir.delete()
+    }
+    if(jniDir.exists()){
+        for(File f : jniDir.listFiles()){
+            f.delete()
+        }
+    }else{
+        jniDir.mkdir()
+    }
+}
+
+task includeJni(type: Copy) {
+    def src = file("${project.getProjectDir()}/jni")
+    def dst = file("${project.getBuildDir()}/jni")
+    from(src)
+    into(dst)
+}
+
+cleanupJni.mustRunAfter(build)
+includeJni.mustRunAfter(cleanupJni)
