@@ -1,6 +1,6 @@
 package com.nocmok.pancake;
 
-public enum BandSpectrum {
+public enum Spectrum {
     /** Red */
     R("r"),
 
@@ -20,7 +20,7 @@ public enum BandSpectrum {
 
     private String name;
 
-    private BandSpectrum(String name) {
+    private Spectrum(String name) {
         this.name = name;
     }
 
