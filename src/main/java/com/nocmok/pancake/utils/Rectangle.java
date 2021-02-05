@@ -28,6 +28,22 @@ public class Rectangle {
         return y0;
     }
 
+    /**
+     * 
+     * @return right most x that still belongs to rectangle
+     */
+    public int x1() {
+        return x0 + xSize;
+    }
+
+    /**
+     * 
+     * @return bottom most y that still belongs to rectangle
+     */
+    public int y1() {
+        return y0 + ySize;
+    }
+
     public int xSize() {
         return xSize;
     }
