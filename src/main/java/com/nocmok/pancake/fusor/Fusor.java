@@ -5,8 +5,6 @@ import java.util.Map;
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.utils.Rectangle;
 
-import org.gdal.gdal.Band;
-
 /**
  * This interface specifies api for objects, that apply fusion algorithm to
  * fully prepared bands. The objects of this interface not aimed to perform any
@@ -21,7 +19,7 @@ public interface Fusor {
      * @param dst destination bands to which result will be written
      * @param src source bands, that have to be fused
      */
-    public void fuse(Map<Spectrum, ? extends Band> dst, Map<Spectrum, ? extends Band> src);
+    public void fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src);
 
     /**
      * 
@@ -29,6 +27,6 @@ public interface Fusor {
      * @param src  source bands, that have to be fused
      * @param area target area to fuse
      */
-    public void fuse(Map<Spectrum, ? extends Band> dst, Map<Spectrum, ? extends Band> src, Rectangle area);
+    public void fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src, Rectangle area);
 
 }
