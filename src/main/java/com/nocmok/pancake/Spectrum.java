@@ -1,6 +1,10 @@
 package com.nocmok.pancake;
 
 public enum Spectrum {
+    
+    /** Undefined spectrum */
+    NONE("none"),
+    
     /** Red */
     R("r"),
 
