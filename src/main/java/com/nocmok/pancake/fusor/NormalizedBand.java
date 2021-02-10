@@ -8,7 +8,7 @@ import com.nocmok.pancake.Pancake;
 import org.gdal.gdal.Band;
 import org.gdal.gdal.gdal;
 
-public class NormalizedBand {
+public class NormalizedBand implements PancakeBand {
 
     private Band band;
 
@@ -39,6 +39,9 @@ public class NormalizedBand {
      * 0 - x coordinate 1 - y coordinate values [-1, -1] mean lack of cached block
      */
     private int[] blockInCache = new int[] { -1, -1 };
+
+    /** Whether block cache was modified */
+    private boolean isDirty = false;
 
     private int dataTypeBytesSize;
 
@@ -111,7 +114,7 @@ public class NormalizedBand {
      * @return x coordinate of block which contains sample with specified x
      *         coordinate
      */
-    private int toBlockX(int x) {
+    public int toBlockX(int x) {
         return x / blockXSize;
     }
 
@@ -119,7 +122,7 @@ public class NormalizedBand {
      * @return y coordinate of block which contains sample with specified y
      *         coordinate
      */
-    private int toBlockY(int y) {
+    public int toBlockY(int y) {
         return y / blockYSize;
     }
 
@@ -127,7 +130,7 @@ public class NormalizedBand {
      * @return x coordinate of first sample, which belongs to block with specified x
      *         coordinate
      */
-    private int blockXStart(int blockX) {
+    public int blockXStart(int blockX) {
         return blockX * blockXSize;
     }
 
@@ -135,21 +138,21 @@ public class NormalizedBand {
      * @return y coordinate of first sample, which belongs to block with specified y
      *         coordinate
      */
-    private int blockYStart(int blockY) {
+    public int blockYStart(int blockY) {
         return blockY * blockYSize;
     }
 
     /**
      * @return width of block with specified x coordinate
      */
-    private int blockXSize(int blockX) {
+    public int blockXSize(int blockX) {
         return (blockX + 1 < blocksInRow) ? (blockXSize) : (band.getXSize() - (blocksInRow - 1) * blockXSize);
     }
 
     /**
      * @return height of block with specified y coordinate
      */
-    private int blockYSize(int blockY) {
+    public int blockYSize(int blockY) {
         return (blockY + 1 < blocksInCol) ? (blockYSize) : (band.getYSize() - (blocksInCol - 1) * blockYSize);
     }
 
@@ -179,14 +182,10 @@ public class NormalizedBand {
      */
     private void cacheBlock(int blockX, int blockY) {
         flushCache();
-        // band.ReadBlock_Direct(blockX, blockY, blockCache);
-
         int curBlockXSize = blockXSize(blockX);
         int curBlockYSize = blockYSize(blockY);
-
         band.ReadRaster_Direct(blockX * blockXSize, blockY * blockYSize, curBlockXSize, curBlockYSize, curBlockXSize,
                 curBlockYSize, band.GetRasterDataType(), blockCache);
-
         blockInCache[0] = blockX;
         blockInCache[1] = blockY;
     }
@@ -263,6 +262,7 @@ public class NormalizedBand {
             default:
                 throw new UnsupportedOperationException("unsupported sample data type " + band.getDataType());
         }
+        isDirty = true;
     }
 
     /**
@@ -338,18 +338,15 @@ public class NormalizedBand {
      */
     public void flushCache() {
         if (blockInCache[0] != -1 && blockInCache[1] != -1) {
-            // band.WriteBlock_Direct(blockInCache[0], blockInCache[1], blockCache);
-
-            int curBlockXSize = blockXSize(blockInCache[0]);
-            int curBlockYSize = blockYSize(blockInCache[1]);
-
-            band.WriteRaster_Direct(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
-                    curBlockYSize, curBlockXSize, curBlockYSize, band.getDataType(), blockCache);
-            
-                    // System.out.println("band " +
-            // gdal.GetColorInterpretationName(band.GetColorInterpretation())
-            // + " cache dropped for block " + "[" + blockInCache[0] + "," + blockInCache[1]
-            // + "]");
+            if (isDirty) {
+                int curBlockXSize = blockXSize(blockInCache[0]);
+                int curBlockYSize = blockYSize(blockInCache[1]);
+                band.WriteRaster_Direct(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
+                        curBlockYSize, curBlockXSize, curBlockYSize, band.getDataType(), blockCache);
+                // System.out.println("band " + gdal.GetColorInterpretationName(band.GetColorInterpretation())
+                        // + " cache dropped for block " + "[" + blockInCache[0] + "," + blockInCache[1] + "]");
+                isDirty = false;
+            }
         }
     }
 }
