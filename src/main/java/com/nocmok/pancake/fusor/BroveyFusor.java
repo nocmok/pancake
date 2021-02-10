@@ -7,8 +7,6 @@ import java.util.Map;
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.utils.Rectangle;
 
-import org.gdal.gdal.Band;
-
 public class BroveyFusor implements Fusor {
 
     /** weight of red band */
@@ -31,7 +29,7 @@ public class BroveyFusor implements Fusor {
         this(1.0, 1.0, 1.0);
     }
 
-    private void validateDst(Map<Spectrum, ? extends Band> dst) {
+    private void validateDst(Map<Spectrum, PancakeBand> dst) {
         List<Spectrum> dstRequiredBands = List.of(Spectrum.R, Spectrum.G, Spectrum.B);
         for (Spectrum spect : dstRequiredBands) {
             if (!dst.containsKey(spect)) {
@@ -40,7 +38,7 @@ public class BroveyFusor implements Fusor {
         }
     }
 
-    private void validateSrc(Map<Spectrum, ? extends Band> src) {
+    private void validateSrc(Map<Spectrum, PancakeBand> src) {
         List<Spectrum> srcRequiredBands = List.of(Spectrum.R, Spectrum.G, Spectrum.B, Spectrum.PA);
         for (Spectrum spect : srcRequiredBands) {
             if (!src.containsKey(spect)) {
@@ -49,15 +47,15 @@ public class BroveyFusor implements Fusor {
         }
     }
 
-    private void validateArgs(Map<Spectrum, ? extends Band> dst, Map<Spectrum, ? extends Band> src) {
+    private void validateArgs(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src) {
         validateDst(dst);
         validateSrc(src);
         int paXSize = src.get(Spectrum.PA).getXSize();
         int paYSize = src.get(Spectrum.PA).getYSize();
-        List<Band> allBands = new ArrayList<>();
+        List<PancakeBand> allBands = new ArrayList<>();
         allBands.addAll(dst.values());
         allBands.addAll(src.values());
-        for (Band band : allBands) {
+        for (var band : allBands) {
             if ((band.getXSize() != paXSize) || (band.getYSize() != paYSize)) {
                 throw new RuntimeException("one of provided band mismatch panchromatic band resolution");
             }
@@ -65,20 +63,20 @@ public class BroveyFusor implements Fusor {
     }
 
     @Override
-    public void fuse(Map<Spectrum, ? extends Band> dst, Map<Spectrum, ? extends Band> src, Rectangle region) {
+    public void fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src, Rectangle region) {
         validateArgs(dst, src);
         _fuse(dst, src, region);
     }
 
-    private void _fuse(Map<Spectrum, ? extends Band> dst, Map<Spectrum, ? extends Band> src, Rectangle region) {
-        NormalizedBand r = new NormalizedBand(dst.get(Spectrum.R));
-        NormalizedBand g = new NormalizedBand(dst.get(Spectrum.G));
-        NormalizedBand b = new NormalizedBand(dst.get(Spectrum.B));
+    private void _fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src, Rectangle region) {
+        var r = dst.get(Spectrum.R);
+        var g = dst.get(Spectrum.G);
+        var b = dst.get(Spectrum.B);
 
-        NormalizedBand r0 = new NormalizedBand(src.get(Spectrum.R));
-        NormalizedBand g0 = new NormalizedBand(src.get(Spectrum.G));
-        NormalizedBand b0 = new NormalizedBand(src.get(Spectrum.B));
-        NormalizedBand pa = new NormalizedBand(src.get(Spectrum.PA));
+        var r0 = src.get(Spectrum.R);
+        var g0 = src.get(Spectrum.G);
+        var b0 = src.get(Spectrum.B);
+        var pa = src.get(Spectrum.PA);
 
         int blockXSize = r0.getBlockXSize();
         int blockYSize = r0.getBlockYSize();
@@ -115,7 +113,7 @@ public class BroveyFusor implements Fusor {
     }
 
     @Override
-    public void fuse(Map<Spectrum, ? extends Band> dst, Map<Spectrum, ? extends Band> src) {
+    public void fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src) {
         validateArgs(dst, src);
         _fuse(dst, src, new Rectangle(0, 0, src.get(Spectrum.PA).getXSize(), src.get(Spectrum.PA).getYSize()));
     }
