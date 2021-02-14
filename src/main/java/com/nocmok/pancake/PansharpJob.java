@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ExecutorService;
@@ -15,7 +14,7 @@ import java.util.concurrent.Executors;
 import com.nocmok.pancake.fusor.Fusor;
 import com.nocmok.pancake.fusor.NormalizedBand;
 import com.nocmok.pancake.fusor.PancakeBand;
-import com.nocmok.pancake.upsampler.Upsampler;
+import com.nocmok.pancake.resampler.Resampler;
 import com.nocmok.pancake.utils.PancakeIOException;
 import com.nocmok.pancake.utils.Rectangle;
 import com.nocmok.pancake.utils.PancakeOptions;
@@ -31,7 +30,7 @@ import org.gdal.gdal.gdal;
  */
 public class PansharpJob {
 
-    Upsampler _resampler;
+    Resampler _resampler;
 
     Fusor _fusor;
 
@@ -90,13 +89,14 @@ public class PansharpJob {
 
     public static final String JOB_TILED = "job_tiled";
 
-    PansharpJob(Upsampler resampler, Fusor fusor, Map<Spectrum, Band> mapping, PancakeOptions options) {
+    PansharpJob(Resampler resampler, Fusor fusor, Map<Spectrum, Band> mapping, PancakeOptions options) {
+        this._options = new PancakeOptions(options);
         this._resampler = resampler;
         this._fusor = fusor;
         this._mapping = mapping;
 
         this._targetCompression = Compression
-                .valueOf(options.getStringOr(JOB_COMPRESSION, Compression.NONE.gdalIdentifier()));
+                .byName(options.getStringOr(JOB_COMPRESSION, Compression.NONE.gdalIdentifier()));
         this._targetFormat = Formats.byName(options.getString(JOB_TARGET_FORMAT));
         if (_targetFormat == null) {
             throw new UnsupportedOperationException("unknown format driver " + options.getString("driver"));
@@ -119,6 +119,7 @@ public class PansharpJob {
                 datasetSet.add(Pancake.pathTo(band.GetDataset()));
             }
         }
+        _multispectral = new ArrayList<>();
         _multispecBandsPackingOrder = new ArrayList<>();
         _multispecBandsPackingOrder.add(Spectrum.R);
         _multispecBandsPackingOrder.add(Spectrum.G);
@@ -155,7 +156,9 @@ public class PansharpJob {
 
         /** reuse interpolated dataset if possible */
         if (canReuseResampledDataset()) {
-            multispectral = resample(populateTargetOptions(), _targetFile);
+            PancakeOptions resamplingOptions = populateTargetOptions();
+            resamplingOptions.put(Resampler.OUT_FORMAT, _targetFormat.driverName());
+            multispectral = resample(resamplingOptions, _targetFile);
             artifact = multispectral;
         } else {
             multispectral = resample(null, Pancake.createTempFile());
@@ -163,6 +166,7 @@ public class PansharpJob {
         }
 
         Map<Spectrum, Band> srcMapping = new HashMap<>();
+        srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
         var keyIt = _multispecBandsPackingOrder.iterator();
         var valIt = Pancake.getBands(multispectral).iterator();
         while (valIt.hasNext() && keyIt.hasNext()) {
@@ -196,12 +200,18 @@ public class PansharpJob {
         return false;
     }
 
-    private Dataset resample(PancakeOptions options, File dst) {
-        options = Optional.ofNullable(options).orElse(new PancakeOptions());
-        Dataset vrt = Pancake.bundleBandsToVRT(_multispectral, Pancake.createTempFile(), _targetDataType,
-                options.getAsGdalOptions());
+    private Dataset resample(PancakeOptions extraOptions, File dst) {
+        PancakeOptions options = populateResamplingOptions();
+        options.update(extraOptions);
+        Dataset vrt = Pancake.bundleBandsToVRT(_multispectral, Pancake.createTempFile(), _targetDataType, null);
         Dataset scaled = _resampler.upsample(vrt, _targetXSize, _targetYSize, dst, options);
         return scaled;
+    }
+
+    private PancakeOptions populateResamplingOptions() {
+        PancakeOptions options = new PancakeOptions();
+        // options.put(Resampler.OUT_FORMAT, Formats.VRT.driverName());
+        return options;
     }
 
     private Dataset createDstDataset() {
