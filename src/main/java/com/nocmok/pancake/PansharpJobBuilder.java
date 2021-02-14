@@ -4,7 +4,7 @@ import java.io.File;
 import java.util.Map;
 
 import com.nocmok.pancake.fusor.Fusor;
-import com.nocmok.pancake.upsampler.Upsampler;
+import com.nocmok.pancake.resampler.Resampler;
 import com.nocmok.pancake.utils.PancakeOptions;
 
 import org.gdal.gdal.Band;
@@ -13,7 +13,7 @@ public class PansharpJobBuilder {
 
     private PancakeOptions options;
 
-    private Upsampler resampler;
+    private Resampler resampler;
 
     private Fusor fusor;
 
@@ -28,7 +28,7 @@ public class PansharpJobBuilder {
         return this;
     }
 
-    public PansharpJobBuilder withResampler(Upsampler resampler) {
+    public PansharpJobBuilder withResampler(Resampler resampler) {
         this.resampler = resampler;
         return this;
     }
