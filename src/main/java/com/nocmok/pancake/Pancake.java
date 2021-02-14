@@ -1,10 +1,14 @@
 package com.nocmok.pancake;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Vector;
+
+import com.nocmok.pancake.utils.PancakeIOException;
 
 import org.gdal.gdal.Band;
 import org.gdal.gdal.Dataset;
@@ -39,6 +43,29 @@ public class Pancake {
 
     private Pancake() {
 
+    }
+
+    public static File createTempFile() {
+        try {
+            File file = File.createTempFile(".pnk", "tmp");
+            file.deleteOnExit();
+            return file;
+        } catch (IOException e) {
+            throw new PancakeIOException("failed to create temporary file due to i/o error", e);
+        }
+    }
+
+    /** TODO */
+    public static String pathTo(Dataset dataset) {
+        return dataset.GetFileList().firstElement().toString();
+    }
+
+    public static List<Band> getBands(Dataset dataset) {
+        List<Band> bands = new ArrayList<>();
+        for (int nBand = 1; nBand <= dataset.getRasterCount(); ++nBand) {
+            bands.add(dataset.GetRasterBand(nBand));
+        }
+        return bands;
     }
 
     public static void copyBand(Band dst, Band src) {
@@ -112,9 +139,9 @@ public class Pancake {
         return (band.GetBlockXSize() != band.getXSize());
     }
 
-    public static Dataset bundleBandsToVRT(List<Band> bands, File dstFile, int dataType, List<String> options) {
-        int xSize = bands.get(0).getXSize();
-        int ySize = bands.get(0).getYSize();
+    public static Dataset bundleBandsToVRT(Collection<Band> bands, File dstFile, int dataType, List<String> options) {
+        int xSize = bands.iterator().next().getXSize();
+        int ySize = bands.iterator().next().getYSize();
         String[] optionsArr = (options == null) ? (null) : (options.toArray(new String[0]));
         Driver driver = gdal.GetDriverByName("VRT");
         driver.Register();
