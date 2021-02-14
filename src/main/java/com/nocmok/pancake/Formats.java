@@ -24,41 +24,50 @@ public enum Formats {
             driverOptions.put("PHOTOMETRIC", options.getStringOr(PancakeConstants.KEY_PHOTOMETRIC, "MINISBLACK"));
             driverOptions.put("BIGTIFF", options.getStringOr(PancakeConstants.KEY_BIGTIFF, "NO"));
 
-            int compressionQuality, specificQuality;
-            Compression compression = Compression
-                    .valueOf(options.getStringOr(PancakeConstants.KEY_COMPRESSION, "NONE"));
-
-            switch (compression) {
-                case JPEG:
-                    compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 75);
-                    specificQuality = compressionQuality;
-                    driverOptions.put("JPEG_QUALITY", specificQuality);
-                    break;
-                case Deflate:
-                    compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 70);
-                    specificQuality = (int) (((double) compressionQuality) / 100 * 9);
-                    driverOptions.put("ZLEVEL", specificQuality);
-                    break;
-                case LERC_DEFLATE:
-                    compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 50);
-                    specificQuality = (int) ((double) compressionQuality) / 100 * 9;
-                    driverOptions.put("ZLEVEL", specificQuality);
-                    break;
-                case ZSTD:
-                case LERC_ZSTD:
-                    compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 42);
-                    specificQuality = (int) ((double) compressionQuality) / 100 * 9;
-                    driverOptions.put("ZSTD_LEVEL", specificQuality);
-                    break;
-                case WEBP:
-                    compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 75);
-                    specificQuality = compressionQuality;
-                    driverOptions.put("WEBP_LEVEL", specificQuality);
-                    break;
-                default:
-                    break;
+            int compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 0);
+            if (compressionQuality > 0) {
+                int specificQuality;
+                Compression compression = Compression
+                        .byName(options.getStringOr(PancakeConstants.KEY_COMPRESSION, "NONE"));
+                switch (compression) {
+                    case JPEG:
+                        compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 75);
+                        specificQuality = compressionQuality;
+                        driverOptions.put("JPEG_QUALITY", specificQuality);
+                        break;
+                    case Deflate:
+                        compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 70);
+                        specificQuality = (int) (((double) compressionQuality) * 9 / 100);
+                        driverOptions.put("ZLEVEL", specificQuality);
+                        break;
+                    case LERC_DEFLATE:
+                        compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 50);
+                        specificQuality = (int) (((double) compressionQuality) * 9 / 100);
+                        driverOptions.put("ZLEVEL", specificQuality);
+                        break;
+                    case ZSTD:
+                    case LERC_ZSTD:
+                        compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 42);
+                        specificQuality = (int) ((double) compressionQuality) / 100 * 9;
+                        driverOptions.put("ZSTD_LEVEL", specificQuality);
+                        break;
+                    case WEBP:
+                        compressionQuality = options.getIntOr(PancakeConstants.KEY_COMPRESSION_QUALITY, 75);
+                        specificQuality = compressionQuality;
+                        driverOptions.put("WEBP_LEVEL", specificQuality);
+                        break;
+                    default:
+                        break;
+                }
             }
             return driverOptions;
+        }
+    },
+
+    VRT("VRT") {
+        @Override
+        public PancakeOptions toDriverOptions(PancakeOptions options) {
+            throw new UnsupportedOperationException("VRT driver doesn't support any creation options");
         }
     },
 
