@@ -1,7 +1,8 @@
-package com.nocmok.pancake.upsampler;
+package com.nocmok.pancake.resampler;
 
 import java.io.File;
-import java.util.List;
+
+import com.nocmok.pancake.utils.PancakeOptions;
 
 import org.gdal.gdal.Dataset;
 
@@ -9,7 +10,9 @@ import org.gdal.gdal.Dataset;
  * Object of this interface aimed to create upsampled dataset from source
  * dataset.
  */
-public interface Upsampler {
+public interface Resampler {
+
+    public static final String OUT_FORMAT = "rsmp_out_format";
 
     /**
      * 
@@ -19,5 +22,5 @@ public interface Upsampler {
      * @param dest      file which has to back destination dataset
      * @return dataset that contains all bands from source dataset, but upsampled
      */
-    public Dataset upsample(Dataset src, int outWidth, int outHeight, File dest, List<String> options);
+    public Dataset upsample(Dataset src, int outWidth, int outHeight, File dest, PancakeOptions options);
 }
