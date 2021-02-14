@@ -33,6 +33,19 @@ public class PancakeOptions {
         return options.putIfAbsent(key, value) == null;
     }
 
+    /**
+     * Adds specified extra options to this options. Replaces values from
+     * intersecting keys with new ones from extra options.
+     * 
+     * @param extraOptions options to add.
+     */
+    public void update(PancakeOptions extraOptions) {
+        if (extraOptions == null) {
+            return;
+        }
+        this.options.putAll(extraOptions.options);
+    }
+
     public boolean contains(String key) {
         return options.containsKey(key);
     }
