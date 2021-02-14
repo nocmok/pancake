@@ -50,9 +50,15 @@ public class NormalizedBand implements PancakeBand {
     private double dataTypeMinValueFloat;
 
     public NormalizedBand(Band band) {
+        this(band, Integer.min(band.GetBlockXSize(), band.getXSize()),
+                Integer.min(band.GetBlockYSize(), band.getYSize()));
+    }
+
+    public NormalizedBand(Band band, int blockXSize, int blockYSize) {
         this.band = band;
-        this.blockXSize = Integer.min(band.GetBlockXSize(), band.getXSize());
-        this.blockYSize = Integer.min(band.GetBlockYSize(), band.getYSize());
+
+        this.blockXSize = blockXSize;
+        this.blockYSize = blockYSize;
 
         this.dataTypeBytesSize = gdal.GetDataTypeSize(band.GetRasterDataType()) / 8;
 
@@ -343,8 +349,10 @@ public class NormalizedBand implements PancakeBand {
                 int curBlockYSize = blockYSize(blockInCache[1]);
                 band.WriteRaster_Direct(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
                         curBlockYSize, curBlockXSize, curBlockYSize, band.getDataType(), blockCache);
-                // System.out.println("band " + gdal.GetColorInterpretationName(band.GetColorInterpretation())
-                        // + " cache dropped for block " + "[" + blockInCache[0] + "," + blockInCache[1] + "]");
+                // System.out.println("band " +
+                // gdal.GetColorInterpretationName(band.GetColorInterpretation())
+                // + " cache dropped for block " + "[" + blockInCache[0] + "," + blockInCache[1]
+                // + "]");
                 isDirty = false;
             }
         }
