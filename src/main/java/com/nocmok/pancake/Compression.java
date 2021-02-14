@@ -1,5 +1,8 @@
 package com.nocmok.pancake;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public enum Compression {
 
     /** without compression */
@@ -39,6 +42,18 @@ public enum Compression {
     WEBP("WEBP"),
 
     ;
+
+    private static final Map<String, Compression> nameCompressMapping = new HashMap<>();
+
+    static {
+        for (Compression c : Compression.values()) {
+            nameCompressMapping.put(c.gdalIdentifier(), c);
+        }
+    }
+
+    public static Compression byName(String name) {
+        return nameCompressMapping.get(name.toUpperCase());
+    }
 
     private final String gdalIdentifier;
 
