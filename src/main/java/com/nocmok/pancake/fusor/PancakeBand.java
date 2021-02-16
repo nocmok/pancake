@@ -1,64 +1,45 @@
 package com.nocmok.pancake.fusor;
 
+import java.nio.ByteBuffer;
+
 import org.gdal.gdal.Band;
 
+/** Interface for gdal raster band wrappers */
 public interface PancakeBand {
 
-    /**
-     * 
-     * @return value in range [0, 1] which represents sample intensity at x, y
-     */
-    public double get(int x, int y);
+        public int readRasterDirect(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
+                        int buf_type, ByteBuffer nioBuffer);
 
-    /**
-     * set sample at x, y to value in range [0, 1] which represents sample intensity
-     */
-    public void set(int x, int y, double value);
+        public int readRasterDirect​(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
+                        int buf_type, ByteBuffer nioBuffer, int nPixelSpace, int nLineSpace);
 
-    /**
-     * 
-     * @return width of this band
-     */
-    public int getXSize();
+        public int readRasterDirect​(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
+                        ByteBuffer nioBuffer);
 
-    /**
-     * 
-     * @return height of this band
-     */
-    public int getYSize();
+        public int readRasterDirect​(int xoff, int yoff, int xsize, int ysize, ByteBuffer nioBuffer);
 
-    /**
-     * 
-     * @return width of block in samples units
-     */
-    public int getBlockXSize();
+        public int writeRasterDirect​(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
+                        int buf_type, ByteBuffer nioBuffer);
 
-    /**
-     * 
-     * @return height of block in samples units
-     */
-    public int getBlockYSize();
+        public int writeRasterDirect​(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
+                        int buf_type, ByteBuffer nioBuffer, int nPixelSpace, int nLineSpace);
 
-    /**
-     * @return x coordinate of block which contains sample with specified x
-     *         coordinate
-     */
-    public int toBlockX(int x);
+        public int writeRasterDirect​(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
+                        ByteBuffer nioBuffer);
 
-    /**
-     * @return y coordinate of block which contains sample with specified y
-     *         coordinate
-     */
-    public int toBlockY(int y);
+        public int writeRasterDirect​(int xoff, int yoff, int xsize, int ysize, int buf_type, ByteBuffer nioBuffer);
 
-    /**
-     * 
-     * @return gdal band which wrapped by this band
-     */
-    public Band getUnderlyingBand();
+        public int writeRasterDirect​(int xoff, int yoff, int xsize, int ysize, ByteBuffer nioBuffer);
 
-    /**
-     * Drops cached block to the underlying band
-     */
-    public void flushCache();
+        public int getXSize();
+
+        public int getYSize();
+
+        public int getBlockXSize();
+
+        public int getBlockYSize();
+
+        public int getRasterDatatype();
+
+        public Band getUnderlyingBand();
 }
