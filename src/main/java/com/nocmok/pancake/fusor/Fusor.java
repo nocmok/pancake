@@ -19,14 +19,17 @@ public interface Fusor {
      * @param dst destination bands to which result will be written
      * @param src source bands, that have to be fused
      */
-    public void fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src);
+    public void fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src);
 
     /**
+     * 
+     * This method expects all bands to be the same resolution.
      * 
      * @param dst  destination bands to which result will be written
      * @param src  source bands, that have to be fused
      * @param area target area to fuse
      */
-    public void fuse(Map<Spectrum, PancakeBand> dst, Map<Spectrum, PancakeBand> src, Rectangle area);
+    public void fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src,
+            Rectangle area);
 
 }
