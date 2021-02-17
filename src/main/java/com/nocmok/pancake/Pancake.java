@@ -55,9 +55,9 @@ public class Pancake {
         }
     }
 
-    /** TODO */
     public static String pathTo(Dataset dataset) {
-        return dataset.GetFileList().firstElement().toString();
+        Vector<?> fileList = dataset.GetFileList();
+        return fileList != null ? fileList.firstElement().toString() : null;
     }
 
     public static List<Band> getBands(Dataset dataset) {
@@ -66,6 +66,58 @@ public class Pancake {
             bands.add(dataset.GetRasterBand(nBand));
         }
         return bands;
+    }
+
+    public static boolean isIntegerDatatype(int datatype) {
+        switch (datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+            case Pancake.TYPE_INT_16:
+            case Pancake.TYPE_UINT_16:
+            case Pancake.TYPE_INT_32:
+            case Pancake.TYPE_UINT_32:
+                return true;
+            case Pancake.TYPE_FLOAT_32:
+            case Pancake.TYPE_FLOAT_64:
+                return false;
+            default:
+                throw new UnsupportedOperationException("unsupported data type " + datatype);
+        }
+    }
+
+    public static boolean isUnsignedInt(int datatype) {
+        switch (datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+            case Pancake.TYPE_UINT_16:
+            case Pancake.TYPE_UINT_32:
+                return true;
+            case Pancake.TYPE_INT_32:
+            case Pancake.TYPE_INT_16:
+            case Pancake.TYPE_FLOAT_32:
+            case Pancake.TYPE_FLOAT_64:
+                return false;
+            default:
+                throw new UnsupportedOperationException("unsupported data type " + datatype);
+        }
+    }
+
+    public static int getDatatypeSizeBytes(int datatype) {
+        return gdal.GetDataTypeSize(datatype) / 8;
+    }
+
+    public static int getBiggestDatatype(Collection<Integer> datatypes) {
+        int biggestDt = datatypes.iterator().next();
+        for (int dt : datatypes) {
+            if (getDatatypeSizeBytes(dt) > getDatatypeSizeBytes(biggestDt)) {
+                biggestDt = dt;
+            } else if (getDatatypeSizeBytes(dt) == getDatatypeSizeBytes(biggestDt)) {
+                if (isUnsignedInt(biggestDt)) {
+                    biggestDt = dt;
+                }
+            }
+        }
+        return biggestDt;
     }
 
     public static void copyBand(Band dst, Band src) {
