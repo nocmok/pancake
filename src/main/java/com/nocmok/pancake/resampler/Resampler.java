@@ -22,5 +22,5 @@ public interface Resampler {
      * @param dest      file which has to back destination dataset
      * @return dataset that contains all bands from source dataset, but upsampled
      */
-    public Dataset upsample(Dataset src, int outWidth, int outHeight, File dest, PancakeOptions options);
+    public Dataset resample(Dataset src, int outWidth, int outHeight, File dest, PancakeOptions options);
 }
