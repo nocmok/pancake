@@ -20,7 +20,7 @@ public enum Formats {
             driverOptions.put("BLOCKXSIZE", options.getIntOr(PancakeConstants.KEY_BLOCKXSIZE, 256));
             driverOptions.put("BLOCKYSIZE", options.getIntOr(PancakeConstants.KEY_BLOCKYSIZE, 256));
             driverOptions.put("COMPRESS", options.getStringOr(PancakeConstants.KEY_COMPRESSION, "NONE"));
-            driverOptions.put("NUM_THREADS", options.getIntOr(PancakeConstants.KEY_COMPRESSION_NUM_THREADS, 1));
+            driverOptions.put("NUM_THREADS", options.getStringOr(PancakeConstants.KEY_COMPRESSION_NUM_THREADS, "1"));
             driverOptions.put("PHOTOMETRIC", options.getStringOr(PancakeConstants.KEY_PHOTOMETRIC, "MINISBLACK"));
             driverOptions.put("BIGTIFF", options.getStringOr(PancakeConstants.KEY_BIGTIFF, "NO"));
 
@@ -67,7 +67,7 @@ public enum Formats {
     VRT("VRT") {
         @Override
         public PancakeOptions toDriverOptions(PancakeOptions options) {
-            throw new UnsupportedOperationException("VRT driver doesn't support any creation options");
+            return new PancakeOptions();
         }
     },
 
