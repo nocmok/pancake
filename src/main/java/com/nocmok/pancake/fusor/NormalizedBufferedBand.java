@@ -6,11 +6,10 @@ import java.nio.ByteOrder;
 import com.nocmok.pancake.Pancake;
 
 import org.gdal.gdal.Band;
-import org.gdal.gdal.gdal;
 
-public class NormalizedBand implements PancakeBand {
+public class NormalizedBufferedBand {
 
-    private Band band;
+    private PancakeBand pnkband;
 
     private int blockXSize;
 
@@ -43,34 +42,37 @@ public class NormalizedBand implements PancakeBand {
     /** Whether block cache was modified */
     private boolean isDirty = false;
 
+    private int datatype;
+
     private int dataTypeBytesSize;
 
     private double dataTypeMaxValueFloat;
 
     private double dataTypeMinValueFloat;
 
-    public NormalizedBand(Band band) {
-        this(band, Integer.min(band.GetBlockXSize(), band.getXSize()),
-                Integer.min(band.GetBlockYSize(), band.getYSize()));
+    public NormalizedBufferedBand(PancakeBand pnkband) {
+        this(pnkband, Integer.min(pnkband.getBlockXSize(), pnkband.getXSize()),
+                Integer.min(pnkband.getBlockYSize(), pnkband.getYSize()));
     }
 
-    public NormalizedBand(Band band, int blockXSize, int blockYSize) {
-        this.band = band;
+    public NormalizedBufferedBand(PancakeBand pnkband, int blockXSize, int blockYSize) {
+        this.pnkband = pnkband;
+        Band underlyingBand = pnkband.getUnderlyingBand();
 
+        this.datatype = pnkband.getRasterDatatype();
         this.blockXSize = blockXSize;
         this.blockYSize = blockYSize;
-
-        this.dataTypeBytesSize = gdal.GetDataTypeSize(band.GetRasterDataType()) / 8;
+        this.dataTypeBytesSize = Pancake.getDatatypeSizeBytes(datatype);
 
         Double[] dtMaxValue = new Double[] { Double.valueOf(0) };
         Double[] dtMinValue = new Double[] { Double.valueOf(0) };
-        band.GetMaximum(dtMaxValue);
-        band.GetMinimum(dtMinValue);
-        this.dataTypeMaxValueFloat = dtMaxValue[0] != null ? dtMaxValue[0] : getDataTypeMaxValue(band.getDataType());
+        underlyingBand.GetMaximum(dtMaxValue);
+        underlyingBand.GetMinimum(dtMinValue);
+        this.dataTypeMaxValueFloat = dtMaxValue[0] != null ? dtMaxValue[0] : getDataTypeMaxValue(datatype);
         this.dataTypeMinValueFloat = dtMinValue[0] != null ? dtMinValue[0] : 0;
 
-        this.blocksInCol = (band.getYSize() + blockYSize - 1) / blockYSize;
-        this.blocksInRow = (band.getXSize() + blockXSize - 1) / blockXSize;
+        this.blocksInCol = (pnkband.getYSize() + blockYSize - 1) / blockYSize;
+        this.blocksInRow = (pnkband.getXSize() + blockXSize - 1) / blockXSize;
 
         this.blockByteSize = blockXSize * blockYSize * dataTypeBytesSize;
         this.lastXBlockByteSize = blockYSize * blockXSize(blocksInCol - 1) * dataTypeBytesSize;
@@ -152,14 +154,14 @@ public class NormalizedBand implements PancakeBand {
      * @return width of block with specified x coordinate
      */
     public int blockXSize(int blockX) {
-        return (blockX + 1 < blocksInRow) ? (blockXSize) : (band.getXSize() - (blocksInRow - 1) * blockXSize);
+        return (blockX + 1 < blocksInRow) ? (blockXSize) : (pnkband.getXSize() - (blocksInRow - 1) * blockXSize);
     }
 
     /**
      * @return height of block with specified y coordinate
      */
     public int blockYSize(int blockY) {
-        return (blockY + 1 < blocksInCol) ? (blockYSize) : (band.getYSize() - (blocksInCol - 1) * blockYSize);
+        return (blockY + 1 < blocksInCol) ? (blockYSize) : (pnkband.getYSize() - (blocksInCol - 1) * blockYSize);
     }
 
     /**
@@ -190,8 +192,8 @@ public class NormalizedBand implements PancakeBand {
         flushCache();
         int curBlockXSize = blockXSize(blockX);
         int curBlockYSize = blockYSize(blockY);
-        band.ReadRaster_Direct(blockX * blockXSize, blockY * blockYSize, curBlockXSize, curBlockYSize, curBlockXSize,
-                curBlockYSize, band.GetRasterDataType(), blockCache);
+        pnkband.readRasterDirect(blockX * blockXSize, blockY * blockYSize, curBlockXSize, curBlockYSize, curBlockXSize,
+                curBlockYSize, datatype, blockCache);
         blockInCache[0] = blockX;
         blockInCache[1] = blockY;
     }
@@ -215,7 +217,7 @@ public class NormalizedBand implements PancakeBand {
 
     public double get(int x, int y) {
         cacheBlockSoft(toBlockX(x), toBlockY(y));
-        switch (band.getDataType()) {
+        switch (datatype) {
             case Pancake.TYPE_BYTE:
             case Pancake.TYPE_UNKNOWN:
                 return normalizeInt(Byte.toUnsignedInt(blockCache.get(flatIndex(x, y))));
@@ -232,7 +234,7 @@ public class NormalizedBand implements PancakeBand {
             case Pancake.TYPE_FLOAT_64:
                 return normalizeFloat(blockCache.getDouble(flatIndex(x, y)));
             default:
-                throw new UnsupportedOperationException("unsupported sample data type " + band.getDataType());
+                throw new UnsupportedOperationException("unsupported sample data type " + datatype);
         }
     }
 
@@ -246,7 +248,7 @@ public class NormalizedBand implements PancakeBand {
 
     public void set(int x, int y, double value) {
         cacheBlockSoft(toBlockX(x), toBlockY(y));
-        switch (band.getDataType()) {
+        switch (datatype) {
             case Pancake.TYPE_BYTE:
             case Pancake.TYPE_UNKNOWN:
                 blockCache.put(flatIndex(x, y), (byte) (0xff & denormalizeInt(value)));
@@ -266,7 +268,7 @@ public class NormalizedBand implements PancakeBand {
                 blockCache.putDouble(flatIndex(x, y), denormalizeFloat(value));
                 break;
             default:
-                throw new UnsupportedOperationException("unsupported sample data type " + band.getDataType());
+                throw new UnsupportedOperationException("unsupported sample data type " + datatype);
         }
         isDirty = true;
     }
@@ -276,7 +278,7 @@ public class NormalizedBand implements PancakeBand {
      * @return width of band in samples
      */
     public int getXSize() {
-        return band.getXSize();
+        return pnkband.getXSize();
     }
 
     /**
@@ -284,7 +286,7 @@ public class NormalizedBand implements PancakeBand {
      * @return height of band in samples
      */
     public int getYSize() {
-        return band.getYSize();
+        return pnkband.getYSize();
     }
 
     /**
@@ -303,8 +305,8 @@ public class NormalizedBand implements PancakeBand {
         return blockYSize;
     }
 
-    public Band getUnderlyingBand() {
-        return band;
+    public PancakeBand getUnderlyingBand() {
+        return pnkband;
     }
 
     /**
@@ -347,12 +349,9 @@ public class NormalizedBand implements PancakeBand {
             if (isDirty) {
                 int curBlockXSize = blockXSize(blockInCache[0]);
                 int curBlockYSize = blockYSize(blockInCache[1]);
-                band.WriteRaster_Direct(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
-                        curBlockYSize, curBlockXSize, curBlockYSize, band.getDataType(), blockCache);
-                // System.out.println("band " +
-                // gdal.GetColorInterpretationName(band.GetColorInterpretation())
-                // + " cache dropped for block " + "[" + blockInCache[0] + "," + blockInCache[1]
-                // + "]");
+                pnkband.writeRasterDirect(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
+                        curBlockYSize, curBlockXSize, curBlockYSize, datatype, blockCache);
+
                 isDirty = false;
             }
         }
