@@ -30,7 +30,7 @@ public class Rectangle {
 
     /**
      * 
-     * @return right most x that still belongs to rectangle
+     * @return first x > x0 that doesn't belongs to this rectangle
      */
     public int x1() {
         return x0 + xSize;
@@ -38,7 +38,7 @@ public class Rectangle {
 
     /**
      * 
-     * @return bottom most y that still belongs to rectangle
+     * @return first y > y0 that doesn't belongs to this rectangle
      */
     public int y1() {
         return y0 + ySize;
