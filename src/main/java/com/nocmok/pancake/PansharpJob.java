@@ -6,14 +6,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.nocmok.pancake.fusor.Fusor;
-import com.nocmok.pancake.fusor.NormalizedBand;
+import com.nocmok.pancake.fusor.GdalBandMirror;
 import com.nocmok.pancake.fusor.PancakeBand;
+import com.nocmok.pancake.resampler.OnTheFlyResampler;
 import com.nocmok.pancake.resampler.Resampler;
 import com.nocmok.pancake.utils.PancakeIOException;
 import com.nocmok.pancake.utils.Rectangle;
@@ -70,6 +72,8 @@ public class PansharpJob {
 
     /** creation options for target artifact */
     PancakeOptions _targetOptions;
+
+    PancakeOptions _resamplingOptions;
 
     public static final String JOB_TARGET_FORMAT = "job_out_format";
 
@@ -132,6 +136,7 @@ public class PansharpJob {
             }
         }
         _targetOptions = populateTargetOptions();
+        _resamplingOptions = populateResamplingOptions();
     }
 
     private PancakeOptions populateTargetOptions() {
@@ -148,30 +153,41 @@ public class PansharpJob {
         return options;
     }
 
+    private PancakeOptions populateResamplingOptions() {
+        PancakeOptions options = new PancakeOptions();
+        options.update(Optional.of(_targetOptions).orElse(populateTargetOptions()));
+        if (!(_resampler instanceof OnTheFlyResampler)) {
+            options.put(Resampler.OUT_FORMAT, _targetFormat.driverName());
+        }
+        return options;
+    }
+
     public Dataset pansharp() {
         validateSpatialReferences();
 
         Dataset multispectral;
         Dataset artifact;
 
-        /** reuse interpolated dataset if possible */
+        PancakeOptions targetOptions = _targetOptions;
+        PancakeOptions resamplingOptions = _resamplingOptions;
+
+        /** reuse resampled dataset if possible */
         if (canReuseResampledDataset()) {
-            PancakeOptions resamplingOptions = populateTargetOptions();
-            resamplingOptions.put(Resampler.OUT_FORMAT, _targetFormat.driverName());
             multispectral = resample(resamplingOptions, _targetFile);
             artifact = multispectral;
         } else {
-            multispectral = resample(null, Pancake.createTempFile());
-            artifact = createDstDataset();
+            multispectral = resample(resamplingOptions, Pancake.createTempFile());
+            artifact = createTargetDataset(targetOptions, _targetFile);
         }
 
         Map<Spectrum, Band> srcMapping = new HashMap<>();
-        srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
-        var keyIt = _multispecBandsPackingOrder.iterator();
-        var valIt = Pancake.getBands(multispectral).iterator();
-        while (valIt.hasNext() && keyIt.hasNext()) {
-            srcMapping.put(keyIt.next(), valIt.next());
+        var bandsIt = Pancake.getBands(multispectral).iterator();
+        for (Spectrum spect : _multispecBandsPackingOrder) {
+            if (_mapping.containsKey(spect)) {
+                srcMapping.put(spect, bandsIt.next());
+            }
         }
+        srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
 
         Map<Spectrum, Band> dstMapping = new HashMap<>();
         dstMapping.put(Spectrum.R, artifact.GetRasterBand(1));
@@ -184,6 +200,7 @@ public class PansharpJob {
             fuse(dstMapping, srcMapping);
         }
 
+        postProcessArtifact(artifact);
         return artifact;
     }
 
@@ -200,44 +217,35 @@ public class PansharpJob {
         return false;
     }
 
-    private Dataset resample(PancakeOptions extraOptions, File dst) {
-        PancakeOptions options = populateResamplingOptions();
-        options.update(extraOptions);
+    /** TODO */
+    private void postProcessArtifact(Dataset artifact) {
+
+    }
+
+    private Dataset resample(PancakeOptions options, File dst) {
+        PancakeOptions resamplingOptions = options;
         Dataset vrt = Pancake.bundleBandsToVRT(_multispectral, Pancake.createTempFile(), _targetDataType, null);
-        Dataset scaled = _resampler.upsample(vrt, _targetXSize, _targetYSize, dst, options);
+        Dataset scaled = _resampler.resample(vrt, _targetXSize, _targetYSize, dst, resamplingOptions);
+        if (scaled == null) {
+            throw new RuntimeException("failed to create resampled dataset due to error: " + gdal.GetLastErrorMsg());
+        }
         return scaled;
     }
 
-    private PancakeOptions populateResamplingOptions() {
-        PancakeOptions options = new PancakeOptions();
-        // options.put(Resampler.OUT_FORMAT, Formats.VRT.driverName());
-        return options;
-    }
-
-    private Dataset createDstDataset() {
-        PancakeOptions driverOptions = _targetFormat.toDriverOptions(_targetOptions);
-        Dataset dstDataset = _targetDriver.Create(_targetFile.getAbsolutePath(), _targetXSize, _targetYSize, 3,
+    private Dataset createTargetDataset(PancakeOptions options, File dst) {
+        PancakeOptions driverOptions = _targetFormat.toDriverOptions(options);
+        Dataset targetDataset = _targetDriver.Create(_targetFile.getAbsolutePath(), _targetXSize, _targetYSize, 3,
                 _targetDataType, new Vector<>(driverOptions.getAsGdalOptions()));
-        if (dstDataset == null) {
+        if (targetDataset == null) {
             throw new PancakeIOException("failed to create destination dataset: " + gdal.GetLastErrorMsg());
         }
-        return dstDataset;
-    }
-
-    /**
-     * TODO
-     * 
-     * @return [0] - x size of block, [1] - y size of block
-     */
-    private int[] computeOptimalCacheBlockSize() {
-        return new int[] { blockXSize(), blockYSize() };
+        return targetDataset;
     }
 
     private Map<Spectrum, PancakeBand> remap(Map<Spectrum, Band> mapping) {
-        int[] cacheBlockSize = computeOptimalCacheBlockSize();
         Map<Spectrum, PancakeBand> pancakeMapping = new HashMap<>();
         for (var entry : mapping.entrySet()) {
-            PancakeBand pancakeBand = new NormalizedBand(entry.getValue(), cacheBlockSize[0], cacheBlockSize[1]);
+            PancakeBand pancakeBand = new GdalBandMirror(entry.getValue());
             pancakeMapping.put(entry.getKey(), pancakeBand);
         }
         return pancakeMapping;
