@@ -10,7 +10,7 @@ import org.gdal.gdal.Band;
 import org.gdal.gdal.gdal;
 import org.gdal.gdalconst.gdalconst;
 
-public class IntBufferedBand {
+class IntBufferedBand {
 
     private PancakeBand _pnkband;
 
@@ -181,13 +181,17 @@ public class IntBufferedBand {
         return blockInCache[0] == blockX && blockInCache[1] == blockY;
     }
 
+    private boolean hasBlockInCache(){
+        return blockInCache[0] != -1 && blockInCache[1] != -1;
+    }
+
     /**
      * Drops currently cached block to band and read specified block to cache.
      * 
      * @param blockX x coordinate of block to cache
      * @param blockY y coordinate of block to cache
      */
-    private void cacheBlock(int blockX, int blockY) {
+    public void cacheBlock(int blockX, int blockY) {
         flushCache();
         int curBlockXSize = blockXSize(blockX);
         int curBlockYSize = blockYSize(blockY);
@@ -268,6 +272,63 @@ public class IntBufferedBand {
             case Pancake.TYPE_UINT_32:
             case Pancake.TYPE_INT_32:
                 blockCache.putInt(flatIndex(x, y), (int) (0xffffffff & value));
+                break;
+            default:
+                throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
+        }
+        isDirty = true;
+    }
+
+    /**
+     * 
+     * @param i index of i-th element in cached block
+     * @return
+     */
+    public long get(int i) {
+        if(!hasBlockInCache()){
+            throw new RuntimeException("attempt to invoke get on empty cache");
+        }
+        int flatIndex = i * dataTypeBytesSize;
+        switch (_datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+                return detranslate(Byte.toUnsignedInt(blockCache.get(flatIndex)));
+            case Pancake.TYPE_INT_16:
+                return detranslate(blockCache.getShort(flatIndex));
+            case Pancake.TYPE_UINT_16:
+                return detranslate(Short.toUnsignedInt(blockCache.getShort(flatIndex)));
+            case Pancake.TYPE_INT_32:
+                return detranslate(blockCache.getInt(flatIndex));
+            case Pancake.TYPE_UINT_32:
+                return detranslate(Integer.toUnsignedLong(blockCache.getInt(flatIndex)));
+            default:
+                throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
+        }
+    }
+
+    /**
+     * 
+     * @param i index of i-th element in cached block
+     * @param value
+     */
+    public void set(int i, long value){
+        if(!hasBlockInCache()){
+            throw new RuntimeException("attempt to invoke get on empty cache");
+        }
+        value = translate(value);
+        int flatIndex = i * dataTypeBytesSize;
+        switch (_datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+                blockCache.put(flatIndex, (byte) (0xff & value));
+                break;
+            case Pancake.TYPE_UINT_16:
+            case Pancake.TYPE_INT_16:
+                blockCache.putShort(flatIndex, (short) (0xffff & value));
+                break;
+            case Pancake.TYPE_UINT_32:
+            case Pancake.TYPE_INT_32:
+                blockCache.putInt(flatIndex, (int) (0xffffffff & value));
                 break;
             default:
                 throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
