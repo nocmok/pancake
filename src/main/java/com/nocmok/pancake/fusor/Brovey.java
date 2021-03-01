@@ -67,6 +67,10 @@ public class Brovey implements Fusor {
 
     private void _fuseFloat(Map<Spectrum, NormalizedBufferedBand> dst, Map<Spectrum, NormalizedBufferedBand> src,
             Rectangle region) {
+        List<NormalizedBufferedBand> allBands = new ArrayList<>();
+        allBands.addAll(dst.values());
+        allBands.addAll(src.values());
+
         var r = dst.get(Spectrum.R);
         var g = dst.get(Spectrum.G);
         var b = dst.get(Spectrum.B);
@@ -76,31 +80,27 @@ public class Brovey implements Fusor {
         var b0 = src.get(Spectrum.B);
         var pa = src.get(Spectrum.PA);
 
-        int blockXSize = r0.getBlockXSize();
-        int blockYSize = r0.getBlockYSize();
-
-        int x0 = region.x0();
-        int y0 = region.y0();
-
         for (int yBlock = r0.toBlockY(region.y0()); yBlock < r0.toBlockY(region.y1()); ++yBlock) {
             for (int xBlock = r0.toBlockX(region.x0()); xBlock < r0.toBlockX(region.x1()); ++xBlock) {
-                for (int y = y0; y < Integer.min(y0 + blockYSize, region.y1()); ++y) {
-                    for (int x = x0; x < Integer.min(x0 + blockXSize, region.x1()); ++x) {
-                        double pseudoPanchro = r0.get(x, y) + g0.get(x, y) + b0.get(x, y);
-                        if (pseudoPanchro == 0.0) {
-                            // parse no data
-                        } else {
-                            double correction = pa.get(x, y) / pseudoPanchro;
-                            r.set(x, y, r0.get(x, y) * rWeight * correction);
-                            g.set(x, y, g0.get(x, y) * gWeight * correction);
-                            b.set(x, y, b0.get(x, y) * bWeight * correction);
-                        }
+
+                int blockX = xBlock;
+                int blockY = yBlock;
+
+                allBands.forEach(band -> band.cacheBlock(blockX, blockY));
+                int blockSize = pa.blockXSize(xBlock) * pa.blockYSize(yBlock);
+
+                for (int i = 0; i < blockSize; ++i) {
+                    double pseudoPanchro = r0.get(i) + g0.get(i) + b0.get(i);
+                    if (pseudoPanchro == 0.0) {
+                        continue;
+                    } else {
+                        double correction = pa.get(i) / pseudoPanchro;
+                        r.set(i, r0.get(i) * rWeight * correction);
+                        g.set(i, g0.get(i) * gWeight * correction);
+                        b.set(i, b0.get(i) * bWeight * correction);
                     }
                 }
-                x0 += blockXSize;
             }
-            x0 = region.x0();
-            y0 += blockYSize;
         }
 
         r.flushCache();
@@ -109,6 +109,10 @@ public class Brovey implements Fusor {
     }
 
     private void _fuseInt(Map<Spectrum, IntBufferedBand> dst, Map<Spectrum, IntBufferedBand> src, Rectangle region) {
+        List<IntBufferedBand> allBands = new ArrayList<>();
+        allBands.addAll(dst.values());
+        allBands.addAll(src.values());
+
         var r = dst.get(Spectrum.R);
         var g = dst.get(Spectrum.G);
         var b = dst.get(Spectrum.B);
@@ -118,12 +122,6 @@ public class Brovey implements Fusor {
         var b0 = src.get(Spectrum.B);
         var pa = src.get(Spectrum.PA);
 
-        int blockXSize = r0.getBlockXSize();
-        int blockYSize = r0.getBlockYSize();
-
-        int x0 = region.x0();
-        int y0 = region.y0();
-
         long maxValue = pa.getAbsoluteMaxValue();
         long rFactor = (long) (maxValue * rWeight);
         long gFactor = (long) (maxValue * gWeight);
@@ -131,23 +129,23 @@ public class Brovey implements Fusor {
 
         for (int yBlock = r0.toBlockY(region.y0()); yBlock < r0.toBlockY(region.y1()); ++yBlock) {
             for (int xBlock = r0.toBlockX(region.x0()); xBlock < r0.toBlockX(region.x1()); ++xBlock) {
-                for (int y = y0; y < Integer.min(y0 + blockYSize, region.y1()); ++y) {
-                    for (int x = x0; x < Integer.min(x0 + blockXSize, region.x1()); ++x) {
-                        long pseudoPanchro = r0.get(x, y) + g0.get(x, y) + b0.get(x, y);
-                        if (pseudoPanchro == 0) {
-                            // parse no data
-                            continue;
-                        } else {
-                            r.set(x, y, r0.get(x, y) * pa.get(x, y) / pseudoPanchro * rFactor / maxValue);
-                            g.set(x, y, g0.get(x, y) * pa.get(x, y) / pseudoPanchro * gFactor / maxValue);
-                            b.set(x, y, b0.get(x, y) * pa.get(x, y) / pseudoPanchro * bFactor / maxValue);
-                        }
+
+                int blockX = xBlock;
+                int blockY = yBlock;
+
+                allBands.forEach(band -> band.cacheBlock(blockX, blockY));
+                int blockSize = pa.blockXSize(xBlock) * pa.blockYSize(yBlock);
+
+                for (int i = 0; i < blockSize; ++i) {
+                    long pseudoPanchro = r0.get(i) + g0.get(i) + b0.get(i);
+                    if (pseudoPanchro == 0) {
+                        continue;
                     }
+                    r.set(i, r0.get(i) * pa.get(i) / pseudoPanchro * rFactor / maxValue);
+                    g.set(i, g0.get(i) * pa.get(i) / pseudoPanchro * gFactor / maxValue);
+                    b.set(i, b0.get(i) * pa.get(i) / pseudoPanchro * bFactor / maxValue);
                 }
-                x0 += blockXSize;
             }
-            x0 = region.x0();
-            y0 += blockYSize;
         }
 
         r.flushCache();

@@ -6,6 +6,8 @@ import java.nio.ByteOrder;
 import com.nocmok.pancake.Pancake;
 
 import org.gdal.gdal.Band;
+import org.gdal.gdal.gdal;
+import org.gdal.gdalconst.gdalconst;
 
 public class NormalizedBufferedBand {
 
@@ -174,6 +176,10 @@ public class NormalizedBufferedBand {
         return blockInCache[0] == blockX && blockInCache[1] == blockY;
     }
 
+    private boolean hasBlockInCache() {
+        return blockInCache[0] != -1 && blockInCache[1] != -1;
+    }
+
     private double normalizeInt(long value) {
         return (value - dataTypeMinValueFloat) / (dataTypeMaxValueFloat - dataTypeMinValueFloat);
     }
@@ -188,12 +194,15 @@ public class NormalizedBufferedBand {
      * @param blockX x coordinate of block to cache
      * @param blockY y coordinate of block to cache
      */
-    private void cacheBlock(int blockX, int blockY) {
+    public void cacheBlock(int blockX, int blockY) {
         flushCache();
         int curBlockXSize = blockXSize(blockX);
         int curBlockYSize = blockYSize(blockY);
-        pnkband.readRasterDirect(blockX * blockXSize, blockY * blockYSize, curBlockXSize, curBlockYSize, curBlockXSize,
-                curBlockYSize, datatype, blockCache);
+        int code = pnkband.readRasterDirect(blockX * blockXSize, blockY * blockYSize, curBlockXSize, curBlockYSize,
+                curBlockXSize, curBlockYSize, datatype, blockCache);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to cache block, due to error: " + gdal.GetLastErrorMsg());
+        }
         blockInCache[0] = blockX;
         blockInCache[1] = blockY;
     }
@@ -266,6 +275,72 @@ public class NormalizedBufferedBand {
                 break;
             case Pancake.TYPE_FLOAT_64:
                 blockCache.putDouble(flatIndex(x, y), denormalizeFloat(value));
+                break;
+            default:
+                throw new UnsupportedOperationException("unsupported sample data type " + datatype);
+        }
+        isDirty = true;
+    }
+
+    /**
+     * 
+     * @param i index of i-th element in cached block
+     * @return
+     */
+    public double get(int i) {
+        if (!hasBlockInCache()) {
+            throw new RuntimeException("attempt to invoke get on empty cache");
+        }
+        int flatIndex = i * dataTypeBytesSize;
+        switch (datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+                return normalizeInt(Byte.toUnsignedInt(blockCache.get(flatIndex)));
+            case Pancake.TYPE_INT_16:
+                return normalizeInt(blockCache.getShort(flatIndex));
+            case Pancake.TYPE_UINT_16:
+                return normalizeInt(Short.toUnsignedInt(blockCache.getShort(flatIndex)));
+            case Pancake.TYPE_INT_32:
+                return normalizeInt(blockCache.getInt(flatIndex));
+            case Pancake.TYPE_UINT_32:
+                return normalizeInt(Integer.toUnsignedLong(blockCache.getInt(flatIndex)));
+            case Pancake.TYPE_FLOAT_32:
+                return normalizeFloat(blockCache.getFloat(flatIndex));
+            case Pancake.TYPE_FLOAT_64:
+                return normalizeFloat(blockCache.getDouble(flatIndex));
+            default:
+                throw new UnsupportedOperationException("unsupported sample data type " + datatype);
+        }
+    }
+
+    /**
+     * 
+     * @param i     index of i-th element in cached block
+     * @param value
+     */
+    public void set(int i, double value) {
+        if (!hasBlockInCache()) {
+            throw new RuntimeException("attempt to invoke get on empty cache");
+        }
+        int flatIndex = i * dataTypeBytesSize;
+        switch (datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+                blockCache.put(flatIndex, (byte) (0xff & denormalizeInt(value)));
+                break;
+            case Pancake.TYPE_UINT_16:
+            case Pancake.TYPE_INT_16:
+                blockCache.putShort(flatIndex, (short) (0xffff & denormalizeInt(value)));
+                break;
+            case Pancake.TYPE_UINT_32:
+            case Pancake.TYPE_INT_32:
+                blockCache.putInt(flatIndex, denormalizeInt(value));
+                break;
+            case Pancake.TYPE_FLOAT_32:
+                blockCache.putFloat(flatIndex, (float) denormalizeFloat(value));
+                break;
+            case Pancake.TYPE_FLOAT_64:
+                blockCache.putDouble(flatIndex, denormalizeFloat(value));
                 break;
             default:
                 throw new UnsupportedOperationException("unsupported sample data type " + datatype);
