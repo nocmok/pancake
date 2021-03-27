@@ -26,6 +26,11 @@ public class HistogramMatching {
             }
         }
 
+        private static Histogram forDataType(int dtype){
+            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            return Histogram.arrange(size);
+        }
+
         private static boolean useHashmap(int variance) {
             int varianceThreshold = 65536;
             return variance > varianceThreshold;
@@ -152,9 +157,13 @@ public class HistogramMatching {
     }
 
     public Histogram getHistogram(PancakeBand band, int dtype) {
-        int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
-        Histogram hist = Histogram.arrange(size);
+        Histogram hist = Histogram.forDataType(dtype);
         IntBufferedBand wrapper = new IntBufferedBand(band, dtype);
+        _getHistogram(wrapper, hist);
+        return hist;
+    }
+
+    private Histogram _getHistogram(IntBufferedBand wrapper, Histogram hist){
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 wrapper.cacheBlock(blockX, blockY);
@@ -174,6 +183,10 @@ public class HistogramMatching {
 
     private void applyLookupTable(PancakeBand band, Histogram lookup) {
         IntBufferedBand wrapper = new IntBufferedBand(band);
+        _applyLookupTable(wrapper, lookup);
+    }
+
+    private void _applyLookupTable(IntBufferedBand wrapper, Histogram lookup){
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 int blocksize = wrapper.blockXSize(blockX) * wrapper.blockYSize(blockY);
@@ -187,17 +200,25 @@ public class HistogramMatching {
     }
 
     public void matchHistogram(PancakeBand band, Histogram hist) {
-        Histogram bandHist = getHistogram(band);
+        IntBufferedBand wrapper = new IntBufferedBand(band);
+        Histogram bandHist = Histogram.forDataType(band.getRasterDatatype());
+        _getHistogram(wrapper, bandHist);
         Histogram lookup = getLookupTable(bandHist, hist);
-        applyLookupTable(band, lookup);
+        _applyLookupTable(wrapper, lookup);
     }
 
     public void matchHistogram(PancakeBand src, PancakeBand ref) {
         int srcSize = src.getXSize() * src.getYSize();
         int refSize = ref.getXSize() * ref.getYSize();
 
-        Histogram srcHist = getHistogram(src, src.getRasterDatatype());
-        Histogram refHist = getHistogram(ref, src.getRasterDatatype());
+        IntBufferedBand srcWrapper = new IntBufferedBand(src);
+        IntBufferedBand refWrapper = new IntBufferedBand(ref, src.getRasterDatatype());
+
+        Histogram srcHist = Histogram.forDataType(src.getRasterDatatype());
+        Histogram refHist = Histogram.forDataType(src.getRasterDatatype());
+
+        _getHistogram(srcWrapper, srcHist); 
+        _getHistogram(refWrapper, refHist);
 
         if (srcSize > refSize) {
             double scale = (double) srcSize / refSize;
@@ -208,6 +229,6 @@ public class HistogramMatching {
         }
 
         Histogram lookup = getLookupTable(srcHist, refHist);
-        applyLookupTable(src, lookup);
+        _applyLookupTable(srcWrapper, lookup);
     }
 }
