@@ -2,7 +2,6 @@ package com.nocmok.pancake.utils;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Optional;
 
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
@@ -11,6 +10,10 @@ import org.gdal.gdal.Band;
 import org.gdal.gdal.gdal;
 import org.gdal.gdalconst.gdalconst;
 
+/**
+ * Limitations:
+ * only unsigned integer datatypes
+ */
 public class IntBufferedBand {
 
     private PancakeBand _pnkband;
@@ -46,13 +49,17 @@ public class IntBufferedBand {
     /** Whether block cache was modified */
     private boolean isDirty = false;
 
-    private int _datatype;
+    // private int _datatype;
 
     private int dataTypeBytesSize;
 
     private long _maxValue;
 
     private long _minValue;
+
+    private long _maxValueNative;
+
+    private long _minValueNative;
 
     public IntBufferedBand(PancakeBand pnkBand) {
         this(pnkBand, Integer.min(pnkBand.getBlockXSize(), pnkBand.getXSize()),
@@ -64,21 +71,30 @@ public class IntBufferedBand {
                 Integer.min(pnkBand.getBlockYSize(), pnkBand.getYSize()), dataType);
     }
 
+    /**
+     * 
+     * @param pnkBand 
+     * @param blockXSize desired cache block width
+     * @param blockYSize desired cache block height
+     * @param datatype target data type in which all values desired to be converted
+     */
     public IntBufferedBand(PancakeBand pnkBand, int blockXSize, int blockYSize, int datatype) {
         this._pnkband = pnkBand;
         Band wrappedBand = pnkBand.getUnderlyingBand();
-        this._datatype = datatype;
-        this.dataTypeBytesSize = gdal.GetDataTypeSize(datatype) / 8;
+        
+        // this._datatype = datatype;
+        this.dataTypeBytesSize = Pancake.getDatatypeSizeBytes(_pnkband.getRasterDatatype());
+
         if (!Pancake.isIntegerDatatype(datatype)) {
             throw new UnsupportedOperationException(
                     "expected integer datatype, but " + gdal.GetDataTypeName(datatype) + " was provided");
         }
-        Double[] dtMaxValue = new Double[] { Double.valueOf(0) };
-        Double[] dtMinValue = new Double[] { Double.valueOf(0) };
-        wrappedBand.GetMaximum(dtMaxValue);
-        wrappedBand.GetMinimum(dtMinValue);
-        _maxValue = Optional.ofNullable(dtMaxValue[0]).orElse((double) getDataTypeMaxValue(datatype)).longValue();
-        _minValue = Optional.ofNullable(dtMinValue[0]).orElse(0.0).longValue();
+        
+        _maxValueNative = (long) _pnkband.maxValue();
+        _minValueNative = (long) _pnkband.minValue();
+
+        _maxValue = (long) Pancake.getDatatypeMax(datatype);
+        _minValue = (long) Pancake.getDatatypeMin(datatype);
 
         this.blockXSize = blockXSize;
         this.blockYSize = blockYSize;
@@ -86,31 +102,13 @@ public class IntBufferedBand {
         this.blocksInCol = (wrappedBand.getYSize() + blockYSize - 1) / blockYSize;
         this.blocksInRow = (wrappedBand.getXSize() + blockXSize - 1) / blockXSize;
 
-        this.blockByteSize = blockXSize * blockYSize * dataTypeBytesSize;
-        this.lastXBlockByteSize = blockYSize * blockXSize(blocksInCol - 1) * dataTypeBytesSize;
-        this.lastYBlockByteSize = blockXSize * blockYSize(blocksInRow - 1) * dataTypeBytesSize;
-        this.lastXYBlockByteSize = blockXSize(blocksInCol - 1) * blockYSize(blocksInRow - 1) * dataTypeBytesSize;
+        this.blockByteSize = blockXSize * blockYSize * Pancake.getDatatypeSizeBytes(_pnkband.getRasterDatatype());
+        this.lastXBlockByteSize = blockYSize * blockXSize(blocksInCol - 1) * Pancake.getDatatypeSizeBytes(_pnkband.getRasterDatatype());
+        this.lastYBlockByteSize = blockXSize * blockYSize(blocksInRow - 1) * Pancake.getDatatypeSizeBytes(_pnkband.getRasterDatatype());
+        this.lastXYBlockByteSize = blockXSize(blocksInCol - 1) * blockYSize(blocksInRow - 1) * Pancake.getDatatypeSizeBytes(_pnkband.getRasterDatatype());
 
         this.blockCache = ByteBuffer.allocateDirect(blockByteSize);
         this.blockCache.order(ByteOrder.nativeOrder());
-    }
-
-    private long getDataTypeMaxValue(int dataType) {
-        switch (dataType) {
-            case Pancake.TYPE_BYTE:
-            case Pancake.TYPE_UNKNOWN:
-                return 0xff;
-            case Pancake.TYPE_INT_16:
-                return 0x7fff;
-            case Pancake.TYPE_UINT_16:
-                return 0xffff;
-            case Pancake.TYPE_INT_32:
-                return 0x7fffffff;
-            case Pancake.TYPE_UINT_32:
-                return 0xffffffffL;
-            default:
-                throw new UnsupportedOperationException("unsupported sample data type " + dataType);
-        }
     }
 
     private int getBlockSize(int blockX, int blockY) {
@@ -197,7 +195,7 @@ public class IntBufferedBand {
         int curBlockXSize = blockXSize(blockX);
         int curBlockYSize = blockYSize(blockY);
         int code = _pnkband.readRasterDirect(blockX * blockXSize, blockY * blockYSize, curBlockXSize, curBlockYSize,
-                curBlockXSize, curBlockYSize, _datatype, blockCache);
+                curBlockXSize, curBlockYSize, _pnkband.getRasterDatatype(), blockCache);
         if (code == gdalconst.CE_Failure) {
             throw new RuntimeException("failed to cache block, due to error: " + gdal.GetLastErrorMsg());
         }
@@ -223,11 +221,11 @@ public class IntBufferedBand {
     }
 
     private long translate(long value) {
-        return value + _minValue;
+        return value * _maxValueNative / _maxValue;
     }
 
     private long detranslate(long value) {
-        return value - _minValue;
+        return value * _maxValue / _maxValueNative;
     }
 
     /**
@@ -236,7 +234,7 @@ public class IntBufferedBand {
      */
     public long get(int x, int y) {
         cacheBlockSoft(toBlockX(x), toBlockY(y));
-        switch (_datatype) {
+        switch (_pnkband.getRasterDatatype()) {
             case Pancake.TYPE_BYTE:
             case Pancake.TYPE_UNKNOWN:
                 return detranslate(Byte.toUnsignedInt(blockCache.get(flatIndex(x, y))));
@@ -249,7 +247,7 @@ public class IntBufferedBand {
             case Pancake.TYPE_UINT_32:
                 return detranslate(Integer.toUnsignedLong(blockCache.getInt(flatIndex(x, y))));
             default:
-                throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
+                throw new UnsupportedOperationException("unsupported sample data type " + _pnkband.getRasterDatatype());
         }
     }
 
@@ -261,7 +259,7 @@ public class IntBufferedBand {
     public void set(int x, int y, long value) {
         cacheBlockSoft(toBlockX(x), toBlockY(y));
         value = translate(value);
-        switch (_datatype) {
+        switch (_pnkband.getRasterDatatype()) {
             case Pancake.TYPE_BYTE:
             case Pancake.TYPE_UNKNOWN:
                 blockCache.put(flatIndex(x, y), (byte) (0xff & value));
@@ -275,7 +273,7 @@ public class IntBufferedBand {
                 blockCache.putInt(flatIndex(x, y), (int) (0xffffffff & value));
                 break;
             default:
-                throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
+                throw new UnsupportedOperationException("unsupported sample data type " + _pnkband.getRasterDatatype());
         }
         isDirty = true;
     }
@@ -290,7 +288,7 @@ public class IntBufferedBand {
             throw new RuntimeException("attempt to invoke get on empty cache");
         }
         int flatIndex = i * dataTypeBytesSize;
-        switch (_datatype) {
+        switch (_pnkband.getRasterDatatype()) {
             case Pancake.TYPE_BYTE:
             case Pancake.TYPE_UNKNOWN:
                 return detranslate(Byte.toUnsignedInt(blockCache.get(flatIndex)));
@@ -303,7 +301,7 @@ public class IntBufferedBand {
             case Pancake.TYPE_UINT_32:
                 return detranslate(Integer.toUnsignedLong(blockCache.getInt(flatIndex)));
             default:
-                throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
+                throw new UnsupportedOperationException("unsupported sample data type " + _pnkband.getRasterDatatype());
         }
     }
 
@@ -318,7 +316,7 @@ public class IntBufferedBand {
         }
         value = translate(value);
         int flatIndex = i * dataTypeBytesSize;
-        switch (_datatype) {
+        switch (_pnkband.getRasterDatatype()) {
             case Pancake.TYPE_BYTE:
             case Pancake.TYPE_UNKNOWN:
                 blockCache.put(flatIndex, (byte) (0xff & value));
@@ -332,7 +330,7 @@ public class IntBufferedBand {
                 blockCache.putInt(flatIndex, (int) (0xffffffff & value));
                 break;
             default:
-                throw new UnsupportedOperationException("unsupported sample data type " + _datatype);
+                throw new UnsupportedOperationException("unsupported sample data type " + _pnkband.getRasterDatatype());
         }
         isDirty = true;
     }
@@ -399,7 +397,7 @@ public class IntBufferedBand {
      * @return max possible value that underlying band ables to hold
      */
     public long getAbsoluteMaxValue() {
-        return _maxValue;
+        return _maxValueNative;
     }
 
     /**
@@ -407,7 +405,7 @@ public class IntBufferedBand {
      * @return min possible value that underlying band ables to hold
      */
     public long getAbsoluteMinValue() {
-        return _minValue;
+        return _minValueNative;
     }
 
     /**
@@ -419,7 +417,7 @@ public class IntBufferedBand {
                 int curBlockXSize = blockXSize(blockInCache[0]);
                 int curBlockYSize = blockYSize(blockInCache[1]);
                 int code = _pnkband.writeRasterDirect(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize,
-                        curBlockXSize, curBlockYSize, curBlockXSize, curBlockYSize, _datatype, blockCache);
+                        curBlockXSize, curBlockYSize, curBlockXSize, curBlockYSize, _pnkband.getRasterDatatype(), blockCache);
                 if (code == gdalconst.CE_Failure) {
                     throw new RuntimeException("failed to drop block cache, due to error: " + gdal.GetLastErrorMsg());
                 }
