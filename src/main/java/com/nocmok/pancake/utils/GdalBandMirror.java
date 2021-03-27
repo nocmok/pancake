@@ -4,14 +4,26 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 import org.gdal.gdal.Band;
+
+import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
 
 public class GdalBandMirror implements PancakeBand {
 
     private Band _band;
 
+    private Double[] minVal;
+
+    private Double[] maxVal;
+
     public GdalBandMirror(Band band) {
         this._band = band;
+        this.minVal = new Double[1];
+        this.maxVal = new Double[1];
+        band.GetMaximum(maxVal);
+        band.GetMinimum(minVal);
+        maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.getDatatypeMax(band.GetRasterDataType()));    
+        minVal[0] = Optional.ofNullable(minVal[0]).orElse(Pancake.getDatatypeMin(band.GetRasterDataType()));
     }
 
     @Override
@@ -97,5 +109,15 @@ public class GdalBandMirror implements PancakeBand {
         Double[] noData = new Double[1];
         _band.GetNoDataValue(noData);
         return Optional.ofNullable(noData[0]).orElse(0.0);
+    }
+
+    @Override
+    public double maxValue() {
+        return maxVal[0];
+    }
+
+    @Override
+    public double minValue() {
+        return minVal[0];
     }
 }
