@@ -42,4 +42,8 @@ public interface PancakeBand {
         public double getNoData();
 
         public Band getUnderlyingBand();
+
+        public double maxValue();
+
+        public double minValue();
 }
