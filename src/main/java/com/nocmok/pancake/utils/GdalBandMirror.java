@@ -1,9 +1,10 @@
-package com.nocmok.pancake.fusor;
+package com.nocmok.pancake.utils;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
 import org.gdal.gdal.Band;
+import com.nocmok.pancake.PancakeBand;
 
 public class GdalBandMirror implements PancakeBand {
 

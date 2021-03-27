@@ -106,6 +106,50 @@ public class Pancake {
         return gdal.GetDataTypeSize(datatype) / 8;
     }
 
+    public static double getDatatypeMax(int datatype) {
+        switch (datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+                return 0xff;
+            case Pancake.TYPE_INT_16:
+                return 0x7fff;
+            case Pancake.TYPE_UINT_16:
+                return 0xffff;
+            case Pancake.TYPE_INT_32:
+                return 0x7fffffff;
+            case Pancake.TYPE_UINT_32:
+                return 0xffffffffL;
+            case Pancake.TYPE_FLOAT_32:
+                return Float.MAX_VALUE;
+            case Pancake.TYPE_FLOAT_64:
+                return Double.MAX_VALUE;
+            default:
+                throw new UnsupportedOperationException("unknown data type " + datatype);
+        }
+    }
+
+    public static double getDatatypeMin(int datatype) {
+        switch (datatype) {
+            case Pancake.TYPE_BYTE:
+            case Pancake.TYPE_UNKNOWN:
+                return Byte.MIN_VALUE;
+            case Pancake.TYPE_INT_16:
+                return Short.MIN_VALUE;
+            case Pancake.TYPE_UINT_16:
+                return 0;
+            case Pancake.TYPE_INT_32:
+                return Integer.MIN_VALUE;
+            case Pancake.TYPE_UINT_32:
+                return 0;
+            case Pancake.TYPE_FLOAT_32:
+                return -Float.MAX_VALUE;
+            case Pancake.TYPE_FLOAT_64:
+                return -Double.MAX_VALUE;
+            default:
+                throw new UnsupportedOperationException("unknown data type " + datatype);
+        }
+    }
+
     public static int getBiggestDatatype(Collection<Integer> datatypes) {
         int biggestDt = datatypes.iterator().next();
         for (int dt : datatypes) {

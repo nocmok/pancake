@@ -9,6 +9,9 @@ import java.util.Map;
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.utils.Rectangle;
+import com.nocmok.pancake.utils.IntBufferedBand;
+import com.nocmok.pancake.utils.NormalizedBufferedBand;
+import com.nocmok.pancake.PancakeBand;
 
 public class Brovey implements Fusor {
 

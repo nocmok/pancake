@@ -13,8 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.nocmok.pancake.fusor.Fusor;
-import com.nocmok.pancake.fusor.GdalBandMirror;
-import com.nocmok.pancake.fusor.PancakeBand;
+import com.nocmok.pancake.utils.GdalBandMirror;
 import com.nocmok.pancake.resampler.OnTheFlyResampler;
 import com.nocmok.pancake.resampler.Resampler;
 import com.nocmok.pancake.utils.PancakeIOException;

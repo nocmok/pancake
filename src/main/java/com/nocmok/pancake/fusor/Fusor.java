@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.utils.Rectangle;
+import com.nocmok.pancake.PancakeBand;
 
 /**
  * This interface specifies api for objects, that apply fusion algorithm to
