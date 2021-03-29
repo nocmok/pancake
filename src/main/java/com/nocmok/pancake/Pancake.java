@@ -164,6 +164,10 @@ public class Pancake {
         return biggestDt;
     }
 
+    public static String getDatatypeName(int dtype){
+        return gdal.GetDataTypeName(dtype);
+    }
+
     public static void copyBand(Band dst, Band src) {
         if (dst.GetXSize() != src.getXSize() || dst.getYSize() != src.getYSize()) {
             throw new UnsupportedOperationException("source band resolution mismatch destination band resolution");
