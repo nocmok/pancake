@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 import org.gdal.gdal.Band;
+import org.gdal.gdal.gdal;
+import org.gdal.gdalconst.gdalconst;
 
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
@@ -22,56 +24,88 @@ public class GdalBandMirror implements PancakeBand {
         this.maxVal = new Double[1];
         band.GetMaximum(maxVal);
         band.GetMinimum(minVal);
-        maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.getDatatypeMax(band.GetRasterDataType()));    
+        maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.getDatatypeMax(band.GetRasterDataType()));
         minVal[0] = Optional.ofNullable(minVal[0]).orElse(Pancake.getDatatypeMin(band.GetRasterDataType()));
     }
 
     @Override
     public int readRasterDirect(int xOff, int yOff, int xSize, int ySize, int bufXSize, int bufYSize, int bufType,
             ByteBuffer buffer) {
-        return _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer);
+        int code = _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int readRasterDirect(int xOff, int yOff, int xSize, int ySize, int bufXSize, int bufYSize, int bufType,
             ByteBuffer buffer, int nPixelSpace, int nLineSpace) {
-        return _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer, nPixelSpace,
+        int code = _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer, nPixelSpace,
                 nLineSpace);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int readRasterDirect(int xOff, int yOff, int xSize, int ySize, int bufXSize, int bufYSize,
             ByteBuffer buffer) {
-        return _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, buffer);
+        int code = _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, buffer);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int readRasterDirect(int xOff, int yOff, int xSize, int ySize, ByteBuffer buffer) {
-        return _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, buffer);
+        int code = _band.ReadRaster_Direct(xOff, yOff, xSize, ySize, buffer);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int writeRasterDirect(int xOff, int yOff, int xSize, int ySize, int bufXSize, int bufYSize, int bufType,
             ByteBuffer buffer) {
-        return _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer);
+        int code = _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int writeRasterDirect(int xOff, int yOff, int xSize, int ySize, int bufXSize, int bufYSize, int bufType,
             ByteBuffer buffer, int nPixelSpace, int nLineSpace) {
-        return _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer,
-                nPixelSpace, nLineSpace);
+        int code = _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, bufXSize, bufYSize, bufType, buffer, nPixelSpace,
+                nLineSpace);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int writeRasterDirect(int xOff, int yOff, int xSize, int ySize, int bufXsize, int bufYsize,
             ByteBuffer buffer) {
-        return _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, bufXsize, bufYsize, buffer);
+        int code = _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, bufXsize, bufYsize, buffer);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
     public int writeRasterDirect(int xOff, int yOff, int xSize, int ySize, ByteBuffer buffer) {
-        return _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, buffer);
+        int code = _band.WriteRaster_Direct(xOff, yOff, xSize, ySize, buffer);
+        if (code == gdalconst.CE_Failure) {
+            throw new RuntimeException("failed to read raster: " + gdal.GetLastErrorMsg());
+        }
+        return code;
     }
 
     @Override
