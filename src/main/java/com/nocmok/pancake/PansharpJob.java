@@ -2,6 +2,7 @@ package com.nocmok.pancake;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -9,11 +10,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Vector;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.nocmok.pancake.fusor.Fusor;
 import com.nocmok.pancake.utils.GdalBandMirror;
+import com.nocmok.pancake.utils.HistogramMatching;
+import com.nocmok.pancake.utils.Pair;
 import com.nocmok.pancake.resampler.OnTheFlyResampler;
 import com.nocmok.pancake.resampler.Resampler;
 import com.nocmok.pancake.utils.PancakeIOException;
@@ -179,7 +183,7 @@ public class PansharpJob {
             artifact = createTargetDataset(targetOptions, _targetFile);
         }
 
-        Map<Spectrum, Band> srcMapping = new HashMap<>();
+        Map<Spectrum, Band> srcMapping = new EnumMap<>(Spectrum.class);
         var bandsIt = Pancake.getBands(multispectral).iterator();
         for (Spectrum spect : _multispecBandsPackingOrder) {
             if (_mapping.containsKey(spect)) {
@@ -188,7 +192,7 @@ public class PansharpJob {
         }
         srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
 
-        Map<Spectrum, Band> dstMapping = new HashMap<>();
+        Map<Spectrum, Band> dstMapping = new EnumMap<>(Spectrum.class);
         dstMapping.put(Spectrum.R, artifact.GetRasterBand(1));
         dstMapping.put(Spectrum.G, artifact.GetRasterBand(2));
         dstMapping.put(Spectrum.B, artifact.GetRasterBand(3));
@@ -199,8 +203,25 @@ public class PansharpJob {
             fuse(dstMapping, srcMapping);
         }
 
+        List<Pair<Band, Band>> histMapping = new ArrayList<>();
+        for(Spectrum spec : _multispecBandsPackingOrder){
+            Band fused = dstMapping.get(spec);
+            Band source = _mapping.get(spec);
+            if(fused != null && source != null){
+                histMapping.add(Pair.of(fused, source));
+            }
+        }
+        matchHistograms(histMapping);
+
         postProcessArtifact(artifact);
         return artifact;
+    }
+
+    private void matchHistograms(List<Pair<Band, Band>> mapping){
+        HistogramMatching hm = new HistogramMatching();
+        for(Pair<Band, Band> pair : mapping){
+            hm.matchHistogram(new GdalBandMirror(pair.first()), new GdalBandMirror(pair.second()));
+        }
     }
 
     /** TODO */
