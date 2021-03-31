@@ -7,6 +7,9 @@ import java.util.Optional;
 import java.util.Vector;
 
 import com.nocmok.pancake.Formats;
+import com.nocmok.pancake.GdalHelper;
+import com.nocmok.pancake.Pancake;
+import com.nocmok.pancake.PancakeConstants;
 import com.nocmok.pancake.utils.PancakeOptions;
 
 import org.gdal.gdal.Dataset;
@@ -45,18 +48,31 @@ public abstract class ResamplerBase implements Resampler {
         String outFormat = Optional.ofNullable(options.getString(Resampler.OUT_FORMAT))
                 .orElse(src.GetDriver().getShortName());
 
-        List<String> toList = new ArrayList<>();
-        toList.add("-of");
-        toList.add(outFormat);
-        toList.add("-r");
-        toList.add(resamplingMethod);
-        toList.add("-outsize");
-        toList.add(Integer.toString(outWidth));
-        toList.add(Integer.toString(outHeight));
+        List<String> to = new ArrayList<>();
+        to.add("-of");
+        to.add(outFormat);
+        to.add("-r");
+        to.add(resamplingMethod);
+        to.add("-outsize");
+        to.add(Integer.toString(outWidth));
+        to.add(Integer.toString(outHeight));
+        to.add("-ot");
 
-        List<String> creationOptions = Formats.byName(outFormat).toDriverOptions(options).getAsGdalOptions();
-        toList.addAll(getAsArgList(creationOptions));
+        int dtype = options.getIntOr(PancakeConstants.KEY_DATATYPE, Pancake.TYPE_BYTE);
 
-        return gdal.Translate(dest.getAbsolutePath(), src, new TranslateOptions(new Vector<>(toList)), callback);
+        to.add(Pancake.getDatatypeName(dtype));
+
+        double[] minMax = GdalHelper.computeMinMax(src);
+
+        to.add("-scale");
+        to.add(Integer.toString((int) minMax[0]));
+        to.add(Integer.toString((int) minMax[1]));
+        to.add(Integer.toString((int) Pancake.getDatatypeMin(dtype)));
+        to.add(Integer.toString((int) Pancake.getDatatypeMax(dtype)));
+
+        List<String> co = Formats.byName(outFormat).toDriverOptions(options).getAsGdalOptions();
+        to.addAll(getAsArgList(co));
+
+        return gdal.Translate(dest.getAbsolutePath(), src, new TranslateOptions(new Vector<>(to)), callback);
     }
 }
