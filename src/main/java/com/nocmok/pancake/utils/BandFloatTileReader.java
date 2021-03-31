@@ -10,7 +10,7 @@ import org.gdal.gdal.Band;
 import org.gdal.gdal.gdal;
 import org.gdal.gdalconst.gdalconst;
 
-public class NormalizedBufferedBand {
+public class BandFloatTileReader {
 
     private PancakeBand pnkband;
 
@@ -53,12 +53,12 @@ public class NormalizedBufferedBand {
 
     private double dataTypeMinValueFloat;
 
-    public NormalizedBufferedBand(PancakeBand pnkband) {
+    public BandFloatTileReader(PancakeBand pnkband) {
         this(pnkband, Integer.min(pnkband.getBlockXSize(), pnkband.getXSize()),
                 Integer.min(pnkband.getBlockYSize(), pnkband.getYSize()));
     }
 
-    public NormalizedBufferedBand(PancakeBand pnkband, int blockXSize, int blockYSize) {
+    public BandFloatTileReader(PancakeBand pnkband, int blockXSize, int blockYSize) {
         this.pnkband = pnkband;
         Band underlyingBand = pnkband.getUnderlyingBand();
 

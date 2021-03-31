@@ -10,7 +10,7 @@ import com.nocmok.pancake.PancakeBand;
  * Limitations: only unsigned integer datatypes if datatype is signed, it will
  * be carried like with unsigned datatype with the same bytes
  */
-public class IntBufferedBand {
+public class BandIntTileReader {
 
     private PancakeBand pnkband;
 
@@ -51,18 +51,20 @@ public class IntBufferedBand {
 
     private long minValueNative;
 
-    private int dtbits;
+    private int datatype;
 
-    private int nativeDtbits;
+    private int nativeDatatype;
 
-    public IntBufferedBand(PancakeBand pnkBand) {
-        this(pnkBand, Integer.min(pnkBand.getBlockXSize(), pnkBand.getXSize()),
-                Integer.min(pnkBand.getBlockYSize(), pnkBand.getYSize()), pnkBand.getRasterDatatype());
+    public BandIntTileReader(PancakeBand pnkBand) {
+        this(pnkBand, pnkBand.getBlockXSize(), pnkBand.getBlockYSize(), pnkBand.getRasterDatatype());
     }
 
-    public IntBufferedBand(PancakeBand pnkBand, int dataType) {
-        this(pnkBand, Integer.min(pnkBand.getBlockXSize(), pnkBand.getXSize()),
-                Integer.min(pnkBand.getBlockYSize(), pnkBand.getYSize()), dataType);
+    public BandIntTileReader(PancakeBand pnkBand, int dataType) {
+        this(pnkBand, pnkBand.getBlockXSize(), pnkBand.getBlockYSize(), dataType);
+    }
+
+    public BandIntTileReader(PancakeBand pnkBand, int blockXSize, int blockYSize) {
+        this(pnkBand, blockXSize, blockXSize, pnkBand.getRasterDatatype());
     }
 
     /**
@@ -73,7 +75,7 @@ public class IntBufferedBand {
      * @param datatype   target data type in which all values desired to be
      *                   converted
      */
-    public IntBufferedBand(PancakeBand pnkBand, int blockXSize, int blockYSize, int datatype) {
+    public BandIntTileReader(PancakeBand pnkBand, int blockXSize, int blockYSize, int datatype) {
         if (!Pancake.isIntegerDatatype(datatype)) {
             throw new UnsupportedOperationException(
                     "expected integer datatype, but " + Pancake.getDatatypeName(datatype) + " was provided");
@@ -85,19 +87,20 @@ public class IntBufferedBand {
 
         this.pnkband = pnkBand;
 
-        // this._datatype = datatype;
+        this.datatype = datatype;
+        this.nativeDatatype = pnkBand.getRasterDatatype();
         this.nativeDtBytesSize = Pancake.getDatatypeSizeBytes(pnkband.getRasterDatatype());
 
-        this.dtbits = 8 * Pancake.getDatatypeSizeBytes(datatype);
-        this.nativeDtbits = 8 * Pancake.getDatatypeSizeBytes(pnkband.getRasterDatatype());
-
-        this.maxValue = (1 << dtbits) - 1;
+        this.maxValue = (int) Pancake.getDatatypeMax(datatype);// (int) Math.pow(256,
+                                                               // Pancake.getDatatypeSizeBytes(datatype)) - 1;
         this.minValue = 0;
-        this.maxValueNative = (1 << nativeDtbits) - 1;
+        this.maxValueNative = (int) Pancake.getDatatypeMax(nativeDatatype);// (int) Math.pow(256,
+                                                                           // Pancake.getDatatypeSizeBytes(nativeDatatype))
+                                                                           // - 1;
         this.minValueNative = 0;
 
-        this.blockXSize = blockXSize;
-        this.blockYSize = blockYSize;
+        this.blockXSize = Integer.min(blockXSize, pnkBand.getXSize());
+        this.blockYSize = Integer.min(blockYSize, pnkBand.getYSize());
 
         this.blocksInCol = (pnkband.getYSize() + blockYSize - 1) / blockYSize;
         this.blocksInRow = (pnkband.getXSize() + blockXSize - 1) / blockXSize;
@@ -225,9 +228,11 @@ public class IntBufferedBand {
         case Pancake.TYPE_UNKNOWN:
             return detranslate(Byte.toUnsignedInt(blockCache.get(flatIndex(x, y))));
         case Pancake.TYPE_INT_16:
+            return detranslate(blockCache.getShort(flatIndex(x, y)));
         case Pancake.TYPE_UINT_16:
             return detranslate(Short.toUnsignedInt(blockCache.getShort(flatIndex(x, y))));
         case Pancake.TYPE_INT_32:
+            return detranslate(blockCache.getInt(flatIndex(x, y)));
         case Pancake.TYPE_UINT_32:
             return detranslate(Integer.toUnsignedLong(blockCache.getInt(flatIndex(x, y))));
         default:
@@ -277,9 +282,11 @@ public class IntBufferedBand {
         case Pancake.TYPE_UNKNOWN:
             return detranslate(Byte.toUnsignedInt(blockCache.get(flatIndex)));
         case Pancake.TYPE_INT_16:
+            return detranslate(blockCache.getShort(flatIndex));
         case Pancake.TYPE_UINT_16:
             return detranslate(Short.toUnsignedInt(blockCache.getShort(flatIndex)));
         case Pancake.TYPE_INT_32:
+            return detranslate(blockCache.getInt(flatIndex));
         case Pancake.TYPE_UINT_32:
             return detranslate(Integer.toUnsignedLong(blockCache.getInt(flatIndex)));
         default:
@@ -374,38 +381,51 @@ public class IntBufferedBand {
         return blocksInCol;
     }
 
-    /**
-     * 
-     * @return max possible value that underlying band ables to hold
-     */
-    public long getAbsoluteMaxValue() {
-        return (1l << nativeDtbits) - 1;
+    public long getMaxValue() {
+        return maxValue;
     }
 
-    /**
-     * 
-     * @return min possible value that underlying band ables to hold
-     */
-    public long getAbsoluteMinValue() {
+    public long getMinValue() {
         return 0;
     }
 
+    public int getNativeDatatype() {
+        return nativeDatatype;
+    }
+
+    public int getDatatype() {
+        return datatype;
+    }
+
+    public ByteBuffer getCache() {
+        return this.blockCache;
+    }
+
+    private void _flushCache() {
+        int curBlockXSize = blockXSize(blockInCache[0]);
+        int curBlockYSize = blockYSize(blockInCache[1]);
+        try {
+            pnkband.writeRasterDirect(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
+                    curBlockYSize, curBlockXSize, curBlockYSize, pnkband.getRasterDatatype(), blockCache);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("failed to flush block cache", e);
+        }
+        isDirty = false;
+    }
+
     /**
-     * Drops cached block to the underlying band
+     * Flush cached block if there was changes performed via get/set methods
      */
     public void flushCache() {
-        if (blockInCache[0] != -1 && blockInCache[1] != -1) {
-            if (isDirty) {
-                int curBlockXSize = blockXSize(blockInCache[0]);
-                int curBlockYSize = blockYSize(blockInCache[1]);
-                try {
-                    pnkband.writeRasterDirect(blockInCache[0] * blockXSize, blockInCache[1] * blockYSize, curBlockXSize,
-                            curBlockYSize, curBlockXSize, curBlockYSize, pnkband.getRasterDatatype(), blockCache);
-                } catch (RuntimeException e) {
-                    throw new RuntimeException("failed to flush block cache", e);
-                }
-                isDirty = false;
-            }
+        if (hasBlockInCache() && isDirty) {
+            _flushCache();
+        }
+    }
+
+    /** Flush cached block anyway, except if there is no block cached */
+    public void flushCacheAnyway() {
+        if (hasBlockInCache()) {
+            _flushCache();
         }
     }
 }
