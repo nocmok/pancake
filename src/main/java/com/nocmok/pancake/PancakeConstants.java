@@ -1,7 +1,7 @@
 package com.nocmok.pancake;
 
 public class PancakeConstants {
-    
+
     public static final String KEY_COMPRESSION = "pnk_compress";
 
     public static final String KEY_INTERLEAVE = "pnk_interleave";
@@ -19,4 +19,6 @@ public class PancakeConstants {
     public static final String KEY_COMPRESSION_NUM_THREADS = "pnk_compress_nthreads";
 
     public static final String KEY_COMPRESSION_QUALITY = "pnk_compress_quality";
+
+    public static final String KEY_DATATYPE = "pnk_datatype";
 }
