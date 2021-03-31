@@ -28,6 +28,11 @@ public class PansharpJobBuilder {
         return this;
     }
 
+    public PansharpJobBuilder withOutputDatatype(int dtype) {
+        options.put(PansharpJob.JOB_TARGET_DATATYPE, dtype);
+        return this;
+    }
+
     public PansharpJobBuilder withResampler(Resampler resampler) {
         this.resampler = resampler;
         return this;
@@ -60,6 +65,11 @@ public class PansharpJobBuilder {
 
     public PansharpJobBuilder withSource(Map<Spectrum, Band> source) {
         this.mapping = source;
+        return this;
+    }
+
+    public PansharpJobBuilder useHistMatching(boolean useHistMathcing) {
+        options.put(PansharpJob.JOB_USE_HIST_MATCHING, useHistMathcing);
         return this;
     }
 

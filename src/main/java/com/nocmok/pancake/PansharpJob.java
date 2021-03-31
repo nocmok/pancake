@@ -5,12 +5,12 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Vector;
-import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -71,6 +71,8 @@ public class PansharpJob {
 
     Driver _targetDriver;
 
+    boolean useHistMatching;
+
     PancakeOptions _options;
 
     /** creation options for target artifact */
@@ -96,6 +98,8 @@ public class PansharpJob {
 
     public static final String JOB_TILED = "job_tiled";
 
+    public static final String JOB_USE_HIST_MATCHING = "job_use_hist_matching";
+
     PansharpJob(Resampler resampler, Fusor fusor, Map<Spectrum, Band> mapping, PancakeOptions options) {
         this._options = new PancakeOptions(options);
         this._resampler = resampler;
@@ -106,12 +110,13 @@ public class PansharpJob {
                 .byName(options.getStringOr(JOB_COMPRESSION, Compression.NONE.gdalIdentifier()));
         this._targetFormat = Formats.byName(options.getString(JOB_TARGET_FORMAT));
         if (_targetFormat == null) {
-            throw new UnsupportedOperationException("unknown format driver " + options.getString("driver"));
+            throw new UnsupportedOperationException("unknown format driver " + options.getString(JOB_TARGET_FORMAT));
         }
         this._targetDriver = _targetFormat.getDriver();
         this._targetDriver.Register();
         this._targetFile = new File(options.getStringOr(JOB_TARGET_PATH, "."));
-        this._targetDataType = options.getIntOr(JOB_TARGET_DATATYPE, Pancake.TYPE_INT_16);
+        this._targetDataType = options.getIntOr(JOB_TARGET_DATATYPE, Pancake.TYPE_BYTE);
+        this.useHistMatching = options.getBoolOr(JOB_USE_HIST_MATCHING, true);
 
         _targetXSize = _mapping.get(Spectrum.PA).getXSize();
         _targetYSize = _mapping.get(Spectrum.PA).getYSize();
@@ -121,9 +126,9 @@ public class PansharpJob {
         _datasets = new ArrayList<>();
         Set<String> datasetSet = new HashSet<>();
         for (var band : _bands) {
-            if (!datasetSet.contains(Pancake.pathTo(band.GetDataset()))) {
+            if (!datasetSet.contains(GdalHelper.pathTo(band.GetDataset()))) {
                 _datasets.add(band.GetDataset());
-                datasetSet.add(Pancake.pathTo(band.GetDataset()));
+                datasetSet.add(GdalHelper.pathTo(band.GetDataset()));
             }
         }
         _multispectral = new ArrayList<>();
@@ -138,8 +143,18 @@ public class PansharpJob {
                 _multispectral.add(band);
             }
         }
+        validateMultispectralBands(_multispectral);
         _targetOptions = populateTargetOptions();
         _resamplingOptions = populateResamplingOptions();
+    }
+
+    private void validateMultispectralBands(List<Band> ms) {
+        Band first = ms.get(0);
+        for (Band band : ms) {
+            if (band.getXSize() != first.getXSize() || band.getYSize() != first.getYSize()) {
+                throw new RuntimeException("multispectral bands has different resolutions");
+            }
+        }
     }
 
     private PancakeOptions populateTargetOptions() {
@@ -153,6 +168,7 @@ public class PansharpJob {
         options.put(PancakeConstants.KEY_COMPRESSION, _targetCompression.gdalIdentifier());
         options.put(PancakeConstants.KEY_COMPRESSION_NUM_THREADS, numThreads());
         options.put(PancakeConstants.KEY_COMPRESSION_QUALITY, compressionQuality());
+        options.put(PancakeConstants.KEY_DATATYPE, _targetDataType);
         return options;
     }
 
@@ -168,29 +184,25 @@ public class PansharpJob {
     public Dataset pansharp() {
         validateSpatialReferences();
 
-        Dataset multispectral;
-        Dataset artifact;
-
-        PancakeOptions targetOptions = _targetOptions;
-        PancakeOptions resamplingOptions = _resamplingOptions;
-
-        /** reuse resampled dataset if possible */
-        if (canReuseResampledDataset()) {
-            multispectral = resample(resamplingOptions, _targetFile);
-            artifact = multispectral;
-        } else {
-            multispectral = resample(resamplingOptions, Pancake.createTempFile());
-            artifact = createTargetDataset(targetOptions, _targetFile);
-        }
+        int msXSize = _multispectral.get(0).getXSize();
+        int msYSize = _multispectral.get(0).getYSize();
 
         Map<Spectrum, Band> srcMapping = new EnumMap<>(Spectrum.class);
-        var bandsIt = Pancake.getBands(multispectral).iterator();
-        for (Spectrum spect : _multispecBandsPackingOrder) {
-            if (_mapping.containsKey(spect)) {
-                srcMapping.put(spect, bandsIt.next());
-            }
-        }
         srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
+
+        if (msXSize != _targetXSize || msYSize != _targetYSize) {
+            Dataset multispectral = resample(_resamplingOptions, Pancake.createTempFile());
+            Iterator<Band> bandsIt = GdalHelper.split(multispectral).iterator();
+            for (Spectrum spect : _multispecBandsPackingOrder) {
+                if (_mapping.containsKey(spect)) {
+                    srcMapping.put(spect, bandsIt.next());
+                }
+            }
+        } else {
+            srcMapping.putAll(_mapping);
+        }
+
+        Dataset artifact = createTargetDataset(_targetOptions, _targetFile);
 
         Map<Spectrum, Band> dstMapping = new EnumMap<>(Spectrum.class);
         dstMapping.put(Spectrum.R, artifact.GetRasterBand(1));
@@ -203,23 +215,25 @@ public class PansharpJob {
             fuse(dstMapping, srcMapping);
         }
 
-        List<Pair<Band, Band>> histMapping = new ArrayList<>();
-        for(Spectrum spec : _multispecBandsPackingOrder){
-            Band fused = dstMapping.get(spec);
-            Band source = _mapping.get(spec);
-            if(fused != null && source != null){
-                histMapping.add(Pair.of(fused, source));
+        if (useHistMatching) {
+            List<Pair<Band, Band>> histMapping = new ArrayList<>();
+            for (Spectrum spec : _multispecBandsPackingOrder) {
+                Band fused = dstMapping.get(spec);
+                Band source = _mapping.get(spec);
+                if (fused != null && source != null) {
+                    histMapping.add(Pair.of(fused, source));
+                }
             }
+            matchHistograms(histMapping);
         }
-        matchHistograms(histMapping);
 
         postProcessArtifact(artifact);
         return artifact;
     }
 
-    private void matchHistograms(List<Pair<Band, Band>> mapping){
+    private void matchHistograms(List<Pair<Band, Band>> mapping) {
         HistogramMatching hm = new HistogramMatching();
-        for(Pair<Band, Band> pair : mapping){
+        for (Pair<Band, Band> pair : mapping) {
             hm.matchHistogram(new GdalBandMirror(pair.first()), new GdalBandMirror(pair.second()));
         }
     }
@@ -230,21 +244,13 @@ public class PansharpJob {
     }
 
     /** TODO */
-    private boolean canReuseResampledDataset() {
-        // if upsampler returns non vrt dataset
-        // if fusor on each iteration doesn't use values of any pixel except the current
-        // if multispectral bands contains only r,g,b
-        return false;
-    }
-
-    /** TODO */
     private void postProcessArtifact(Dataset artifact) {
 
     }
 
     private Dataset resample(PancakeOptions options, File dst) {
         PancakeOptions resamplingOptions = options;
-        Dataset vrt = Pancake.bundleBandsToVRT(_multispectral, Pancake.createTempFile(), _targetDataType, null);
+        Dataset vrt = GdalHelper.bundleBandsToVRT(_multispectral, Pancake.createTempFile(), null);
         Dataset scaled = _resampler.resample(vrt, _targetXSize, _targetYSize, dst, resamplingOptions);
         if (scaled == null) {
             throw new RuntimeException("failed to create resampled dataset due to error: " + gdal.GetLastErrorMsg());
