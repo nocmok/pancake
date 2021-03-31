@@ -14,26 +14,18 @@ public class HistogramMatching {
 
     public static abstract class Histogram {
 
-        /**
-         * 
-         * @param dtype band samples data type
-         */
-        private static Histogram arrange(int size) {
-            if (useHashmap(size)) {
-                return new HistogramMap(size);
+        private static Histogram forDataType(int dtype) {
+            if (useHashmap(dtype)) {
+                return new HistogramArray(dtype);
             } else {
-                return new HistogramArray(size);
+                return new HistogramMap(dtype);
             }
         }
 
-        private static Histogram forDataType(int dtype){
+        private static boolean useHashmap(int dtype) {
+            int sizeThreshold = 65536;
             int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
-            return Histogram.arrange(size);
-        }
-
-        private static boolean useHashmap(int variance) {
-            int varianceThreshold = 65536;
-            return variance > varianceThreshold;
+            return size > sizeThreshold;
         }
 
         public abstract void setScale(double scale);
@@ -43,39 +35,55 @@ public class HistogramMatching {
          * @param sample sample value
          * @return how much samples equals to specified sample value
          */
-        public abstract int get(int sample);
+        public abstract int get(long sample);
 
-        protected abstract void set(int sample, int value);
+        protected abstract void set(long sample, int value);
 
-        protected abstract void add(int sample, int value);
+        protected abstract void add(long sample, int value);
 
         public abstract int size();
+
+        public abstract long minVal();
+
+        public abstract long maxVal();
+
+        public abstract int datatype();
     }
 
     static class HistogramArray extends Histogram {
+
+        private int dtype;
+
+        private int minVal;
+
+        private int maxVal;
 
         private int[] hist;
 
         private double scale;
 
-        HistogramArray(int size) {
+        HistogramArray(int dtype) {
+            this.dtype = dtype;
+            this.minVal = (int) Pancake.getDatatypeMin(dtype);
+            this.maxVal = (int) Pancake.getDatatypeMax(dtype);
+            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
             hist = new int[size];
             scale = 1f;
         }
 
         @Override
-        public int get(int sample) {
-            return (int) (scale * hist[sample]);
+        public int get(long sample) {
+            return (int) (scale * hist[(int) sample - minVal]);
         }
 
         @Override
-        protected void set(int sample, int value) {
-            hist[sample] = value;
+        protected void set(long sample, int value) {
+            hist[(int) sample - minVal] = value;
         }
 
         @Override
-        protected void add(int sample, int value) {
-            hist[sample] += value;
+        protected void add(long sample, int value) {
+            hist[(int) sample - minVal] += value;
         }
 
         @Override
@@ -88,34 +96,59 @@ public class HistogramMatching {
             this.scale = scale;
         }
 
+        @Override
+        public long minVal() {
+            return minVal;
+        }
+
+        @Override
+        public long maxVal() {
+            return maxVal;
+        }
+
+        @Override
+        public int datatype() {
+            return dtype;
+        }
+
     }
 
+    /** Up to Int32 / UInt32 */
     static class HistogramMap extends Histogram {
 
-        private Map<Integer, Integer> hist;
+        private int dtype;
+
+        private Map<Long, Integer> hist;
+
+        private long minVal;
+
+        private long maxVal;
 
         private int size;
 
         private double scale;
 
-        HistogramMap(int size) {
-            this.size = size;
+        HistogramMap(int dtype) {
+            this.dtype = dtype;
+            this.size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            this.minVal = (long) Pancake.getDatatypeMin(dtype);
+            this.maxVal = (long) Pancake.getDatatypeMax(dtype);
             hist = new HashMap<>();
             scale = 1f;
         }
 
         @Override
-        public int get(int sample) {
+        public int get(long sample) {
             return (int) (scale * hist.getOrDefault(sample, 0));
         }
 
         @Override
-        protected void set(int sample, int value) {
+        protected void set(long sample, int value) {
             hist.put(sample, value);
         }
 
         @Override
-        protected void add(int sample, int value) {
+        protected void add(long sample, int value) {
             hist.put(sample, hist.getOrDefault(sample, 0) + 1);
         }
 
@@ -128,22 +161,154 @@ public class HistogramMatching {
         public void setScale(double scale) {
             this.scale = scale;
         }
+
+        @Override
+        public long minVal() {
+            return minVal;
+        }
+
+        @Override
+        public long maxVal() {
+            return maxVal;
+        }
+
+        @Override
+        public int datatype() {
+            return dtype;
+        }
     }
 
-    private Histogram getLookupTable(Histogram srcHist, Histogram refHist) {
-        Histogram lookup = Histogram.arrange(refHist.size());
+    static abstract class LookupTable {
 
-        int srcIntensity = 0;
-        int refIntensity = 0;
+        public abstract int get(long sample);
+
+        protected abstract void set(long sample, long value);
+
+        public abstract long minVal();
+
+        public abstract long maxVal();
+
+        public abstract int datatype();
+
+        private static boolean useHashMap(int dtype) {
+            int sizeThreshold = 65536;
+            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            return size > sizeThreshold;
+        }
+
+        private static LookupTable forDatatype(int dtype) {
+            if (useHashMap(dtype)) {
+                throw new UnsupportedOperationException("not implemented");
+                // return new LookupMap(dtype);
+            } else {
+                return new LookupArray(dtype);
+            }
+        }
+
+    }
+
+    /** Up to Int16 / UInt16 */
+    static class LookupArray extends LookupTable {
+
+        private int dtype;
+
+        private int minVal;
+
+        private int maxVal;
+
+        private int[] lookup;
+
+        LookupArray(int dtype) {
+            this.dtype = dtype;
+            this.minVal = (int) Pancake.getDatatypeMin(dtype);
+            this.maxVal = (int) Pancake.getDatatypeMax(dtype);
+            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            lookup = new int[size];
+        }
+
+        @Override
+        public int get(long sample) {
+            return lookup[(int) sample - minVal];
+        }
+
+        @Override
+        public void set(long sample, long value) {
+            lookup[(int) sample - minVal] = (int) value;
+        }
+
+        @Override
+        public long minVal() {
+            return minVal;
+        }
+
+        @Override
+        public long maxVal() {
+            return maxVal;
+        }
+
+        @Override
+        public int datatype() {
+            return dtype;
+        }
+    }
+
+    static class LookupMap extends LookupTable {
+
+        private int dtype;
+
+        private long minVal;
+
+        private long maxVal;
+
+        public LookupMap(int dtype) {
+            this.dtype = dtype;
+            this.minVal = (long) Pancake.getDatatypeMin(dtype);
+            this.maxVal = (long) Pancake.getDatatypeMax(dtype);
+        }
+
+        @Override
+        public int get(long sample) {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        @Override
+        public void set(long sample, long value) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public long minVal() {
+            return minVal;
+        }
+
+        @Override
+        public long maxVal() {
+            return maxVal;
+        }
+
+        @Override
+        public int datatype() {
+            return dtype;
+        }
+
+    }
+
+    private LookupTable getLookupTable(Histogram srcHist, Histogram refHist) {
+        LookupTable lookup = LookupTable.forDatatype(srcHist.datatype());
+
+        long srcIntensity = srcHist.minVal();
+        long refIntensity = refHist.minVal();
 
         int srcCumSum = 0;
-        int refCumSum = refHist.get(0);
+        int refCumSum = refHist.get(refIntensity);
 
-        for (; srcIntensity < srcHist.size(); ++srcIntensity) {
+        for (; srcIntensity <= srcHist.maxVal(); ++srcIntensity) {
             srcCumSum += srcHist.get(srcIntensity);
 
             while (refCumSum < srcCumSum) {
-                if (refIntensity >= refHist.size() - 1) {
+                if (refIntensity >= refHist.maxVal()) {
                     break;
                 }
                 refIntensity++;
@@ -158,12 +323,12 @@ public class HistogramMatching {
 
     public Histogram getHistogram(PancakeBand band, int dtype) {
         Histogram hist = Histogram.forDataType(dtype);
-        IntBufferedBand wrapper = new IntBufferedBand(band, dtype);
+        BandIntTileReader wrapper = new BandIntTileReader(band, dtype);
         _getHistogram(wrapper, hist);
         return hist;
     }
 
-    private Histogram _getHistogram(IntBufferedBand wrapper, Histogram hist){
+    private Histogram _getHistogram(BandIntTileReader wrapper, Histogram hist) {
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 wrapper.cacheBlock(blockX, blockY);
@@ -181,12 +346,7 @@ public class HistogramMatching {
         return getHistogram(band, band.getRasterDatatype());
     }
 
-    private void applyLookupTable(PancakeBand band, Histogram lookup) {
-        IntBufferedBand wrapper = new IntBufferedBand(band);
-        _applyLookupTable(wrapper, lookup);
-    }
-
-    private void _applyLookupTable(IntBufferedBand wrapper, Histogram lookup){
+    private void _applyLookupTable(BandIntTileReader wrapper, LookupTable lookup) {
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 int blocksize = wrapper.blockXSize(blockX) * wrapper.blockYSize(blockY);
@@ -200,10 +360,10 @@ public class HistogramMatching {
     }
 
     public void matchHistogram(PancakeBand band, Histogram hist) {
-        IntBufferedBand wrapper = new IntBufferedBand(band);
+        BandIntTileReader wrapper = new BandIntTileReader(band);
         Histogram bandHist = Histogram.forDataType(band.getRasterDatatype());
         _getHistogram(wrapper, bandHist);
-        Histogram lookup = getLookupTable(bandHist, hist);
+        LookupTable lookup = getLookupTable(bandHist, hist);
         _applyLookupTable(wrapper, lookup);
     }
 
@@ -211,13 +371,13 @@ public class HistogramMatching {
         int srcSize = src.getXSize() * src.getYSize();
         int refSize = ref.getXSize() * ref.getYSize();
 
-        IntBufferedBand srcWrapper = new IntBufferedBand(src);
-        IntBufferedBand refWrapper = new IntBufferedBand(ref, src.getRasterDatatype());
+        BandIntTileReader srcWrapper = new BandIntTileReader(src);
+        BandIntTileReader refWrapper = new BandIntTileReader(ref, src.getRasterDatatype());
 
         Histogram srcHist = Histogram.forDataType(src.getRasterDatatype());
         Histogram refHist = Histogram.forDataType(src.getRasterDatatype());
 
-        _getHistogram(srcWrapper, srcHist); 
+        _getHistogram(srcWrapper, srcHist);
         _getHistogram(refWrapper, refHist);
 
         if (srcSize > refSize) {
@@ -228,7 +388,7 @@ public class HistogramMatching {
             srcHist.setScale(scale);
         }
 
-        Histogram lookup = getLookupTable(srcHist, refHist);
+        LookupTable lookup = getLookupTable(srcHist, refHist);
         _applyLookupTable(srcWrapper, lookup);
     }
 }
