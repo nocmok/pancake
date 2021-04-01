@@ -15,17 +15,18 @@ public class HistogramMatching {
     public static abstract class Histogram {
 
         private static Histogram forDataType(int dtype) {
-            if (useHashmap(dtype)) {
+            if (useArray(dtype)) {
+                // return new HistogramMap(dtype);
                 return new HistogramArray(dtype);
             } else {
-                return new HistogramMap(dtype);
+                throw new UnsupportedOperationException("histogram for datatypes > 16 bit size not implemented");
             }
         }
 
-        private static boolean useHashmap(int dtype) {
+        private static boolean useArray(int dtype) {
             int sizeThreshold = 65536;
             int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
-            return size > sizeThreshold;
+            return size <= sizeThreshold;
         }
 
         public abstract void setScale(double scale);
@@ -180,7 +181,7 @@ public class HistogramMatching {
 
     static abstract class LookupTable {
 
-        public abstract int get(long sample);
+        public abstract long get(long sample);
 
         protected abstract void set(long sample, long value);
 
@@ -190,18 +191,18 @@ public class HistogramMatching {
 
         public abstract int datatype();
 
-        private static boolean useHashMap(int dtype) {
+        private static boolean useArray(int dtype) {
             int sizeThreshold = 65536;
             int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
-            return size > sizeThreshold;
+            return size <= sizeThreshold;
         }
 
         private static LookupTable forDatatype(int dtype) {
-            if (useHashMap(dtype)) {
-                throw new UnsupportedOperationException("not implemented");
-                // return new LookupMap(dtype);
-            } else {
+            if (useArray(dtype)) {
                 return new LookupArray(dtype);
+            } else {
+                throw new UnsupportedOperationException("histogram for datatypes > 16 bit size not implemented");
+                // return new LookupMap(dtype);
             }
         }
 
@@ -227,7 +228,7 @@ public class HistogramMatching {
         }
 
         @Override
-        public int get(long sample) {
+        public long get(long sample) {
             return lookup[(int) sample - minVal];
         }
 
@@ -260,22 +261,23 @@ public class HistogramMatching {
 
         private long maxVal;
 
+        private Map<Long, Long> lookup;
+
         public LookupMap(int dtype) {
             this.dtype = dtype;
             this.minVal = (long) Pancake.getDatatypeMin(dtype);
             this.maxVal = (long) Pancake.getDatatypeMax(dtype);
+            this.lookup = new HashMap<>();
         }
 
         @Override
-        public int get(long sample) {
-            // TODO Auto-generated method stub
-            return 0;
+        public long get(long sample) {
+            return lookup.getOrDefault(sample, 0L);
         }
 
         @Override
         public void set(long sample, long value) {
-            // TODO Auto-generated method stub
-
+            lookup.put(sample, value);
         }
 
         @Override
@@ -322,6 +324,10 @@ public class HistogramMatching {
     }
 
     public Histogram getHistogram(PancakeBand band, int dtype) {
+        if (Pancake.getDatatypeSizeBytes(band.getRasterDatatype()) > 2) {
+            throw new UnsupportedOperationException(
+                    "histogram matching for images with data type > 16 bit not implemented");
+        }
         Histogram hist = Histogram.forDataType(dtype);
         BandIntTileReader wrapper = new BandIntTileReader(band, dtype);
         _getHistogram(wrapper, hist);
@@ -360,6 +366,11 @@ public class HistogramMatching {
     }
 
     public void matchHistogram(PancakeBand band, Histogram hist) {
+        if (Pancake.getDatatypeSizeBytes(band.getRasterDatatype()) > 2) {
+            throw new UnsupportedOperationException(
+                    "histogram matching for images with data type > 16 bit not implemented");
+        }
+
         BandIntTileReader wrapper = new BandIntTileReader(band);
         Histogram bandHist = Histogram.forDataType(band.getRasterDatatype());
         _getHistogram(wrapper, bandHist);
@@ -368,6 +379,11 @@ public class HistogramMatching {
     }
 
     public void matchHistogram(PancakeBand src, PancakeBand ref) {
+        if (Pancake.getDatatypeSizeBytes(src.getRasterDatatype()) > 2) {
+            throw new UnsupportedOperationException(
+                    "histogram matching for images with data type > 16 bit not implemented");
+        }
+
         int srcSize = src.getXSize() * src.getYSize();
         int refSize = ref.getXSize() * ref.getYSize();
 
