@@ -1,6 +1,7 @@
 package com.nocmok.pancake.math;
 
 import com.nocmok.pancake.OpenCvHelper;
+import com.nocmok.pancake.Pancake;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -98,6 +99,37 @@ public class Math2D {
         srcMat.convertTo(dstMat, dstMat.depth(), alpha, beta);
     }
 
+    public void convertAndScale(Buffer2D src, Buffer2D dst) {
+        convertAndScale(src, dst.datatype(), dst);
+    }
+
+    /**
+     * Converts source buffer to destination buffer and scales values from source
+     * buffer in order to fit in destination buffer datatype and preserve ratio
+     * 
+     * @param src
+     * @param dtype
+     * @param dst
+     */
+    public void convertAndScale(Buffer2D src, int dtype, Buffer2D dst) {
+        if ((src == dst) && (dtype == dst.datatype())) {
+            return;
+        }
+        Mat srcMat = matFromBuffer2D(src);
+        Mat dstMat = matFromBuffer2D(dst);
+        if (src.datatype() == dtype) {
+            srcMat.convertTo(dstMat, dtype);
+        } else if (Pancake.getDatatypeMax(dtype) > Pancake.getDatatypeMax(src.datatype())) {
+            double scale = Pancake.getDatatypeMax(dtype) / Pancake.getDatatypeMax(src.datatype());
+            Core.multiply(srcMat, new Scalar(scale), dstMat);
+            dstMat.convertTo(dstMat, dtype);
+        } else {
+            double scale = Pancake.getDatatypeMax(src.datatype()) / Pancake.getDatatypeMax(src.datatype());
+            Core.divide(srcMat, new Scalar(scale), dstMat);
+            dstMat.convertTo(dstMat, dtype);
+        }
+    }
+
     public Stat stat(Buffer2D buf) {
         Stat stat = new Stat();
         Mat mat = matFromBuffer2D(buf);
@@ -123,5 +155,9 @@ public class Math2D {
         Mat srcMat = matFromBuffer2D(src);
         Mat dstMat = matFromBuffer2D(dst);
         Core.multiply(srcMat, new Scalar(scalar), dstMat);
+    }
+
+    public void fill(Buffer2D buf, double scalar) {
+        buf.mat().setTo(new Scalar(scalar));
     }
 }
