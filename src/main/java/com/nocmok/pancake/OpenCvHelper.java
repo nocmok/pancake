@@ -36,27 +36,27 @@ public class OpenCvHelper {
      * @return
      */
     public static int baseType(int dtype) {
-        if (Set.of(CvType.CV_8S, CvType.CV_8SC1, CvType.CV_8SC2, CvType.CV_8SC3, CvType.CV_8SC4).contains(dtype)) {
+        if (Set.of(CvType.CV_8SC1, CvType.CV_8SC2, CvType.CV_8SC3, CvType.CV_8SC4).contains(dtype)) {
             return CvType.CV_8S;
-        } else if (Set.of(CvType.CV_8U, CvType.CV_8UC1, CvType.CV_8UC2, CvType.CV_8UC3, CvType.CV_8UC4)
+        } else if (Set.of(CvType.CV_8UC1, CvType.CV_8UC2, CvType.CV_8UC3, CvType.CV_8UC4)
                 .contains(dtype)) {
             return CvType.CV_8U;
-        } else if (Set.of(CvType.CV_16S, CvType.CV_16SC1, CvType.CV_16SC2, CvType.CV_16SC3, CvType.CV_16SC4)
+        } else if (Set.of(CvType.CV_16SC1, CvType.CV_16SC2, CvType.CV_16SC3, CvType.CV_16SC4)
                 .contains(dtype)) {
             return CvType.CV_16S;
-        } else if (Set.of(CvType.CV_16U, CvType.CV_16UC1, CvType.CV_16UC2, CvType.CV_16UC3, CvType.CV_16UC4)
+        } else if (Set.of(CvType.CV_16UC1, CvType.CV_16UC2, CvType.CV_16UC3, CvType.CV_16UC4)
                 .contains(dtype)) {
             return CvType.CV_16U;
-        } else if (Set.of(CvType.CV_32S, CvType.CV_32SC1, CvType.CV_32SC2, CvType.CV_32SC3, CvType.CV_32SC4)
+        } else if (Set.of(CvType.CV_32SC1, CvType.CV_32SC2, CvType.CV_32SC3, CvType.CV_32SC4)
                 .contains(dtype)) {
             return CvType.CV_32S;
-        } else if (Set.of(CvType.CV_16F, CvType.CV_16FC1, CvType.CV_16FC2, CvType.CV_16FC3, CvType.CV_16FC4)
+        } else if (Set.of(CvType.CV_16FC1, CvType.CV_16FC2, CvType.CV_16FC3, CvType.CV_16FC4)
                 .contains(dtype)) {
             return CvType.CV_16F;
-        } else if (Set.of(CvType.CV_32F, CvType.CV_32FC1, CvType.CV_32FC2, CvType.CV_32FC3, CvType.CV_32FC4)
+        } else if (Set.of(CvType.CV_32FC1, CvType.CV_32FC2, CvType.CV_32FC3, CvType.CV_32FC4)
                 .contains(dtype)) {
             return CvType.CV_32F;
-        } else if (Set.of(CvType.CV_64F, CvType.CV_64FC1, CvType.CV_64FC2, CvType.CV_64FC3, CvType.CV_64FC4)
+        } else if (Set.of(CvType.CV_64FC1, CvType.CV_64FC2, CvType.CV_64FC3, CvType.CV_64FC4)
                 .contains(dtype)) {
             return CvType.CV_64F;
         }
