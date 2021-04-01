@@ -64,7 +64,7 @@ public class BandIntTileReader {
     }
 
     public BandIntTileReader(PancakeBand pnkBand, int blockXSize, int blockYSize) {
-        this(pnkBand, blockXSize, blockXSize, pnkBand.getRasterDatatype());
+        this(pnkBand, blockXSize, blockYSize, pnkBand.getRasterDatatype());
     }
 
     /**
