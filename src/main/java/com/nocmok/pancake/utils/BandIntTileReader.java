@@ -2,6 +2,7 @@ package com.nocmok.pancake.utils;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
@@ -158,6 +159,14 @@ public class BandIntTileReader {
 
     /**
      * 
+     * @return block coordinates of cached block
+     */
+    public int[] getBlockInCache() {
+        return Arrays.copyOf(blockInCache, 2);
+    }
+
+    /**
+     * 
      * @param blockX x coordinate of block
      * @param blockY y coordinate of block
      * @return
@@ -166,7 +175,7 @@ public class BandIntTileReader {
         return blockInCache[0] == blockX && blockInCache[1] == blockY;
     }
 
-    private boolean hasBlockInCache() {
+    public boolean hasBlockInCache() {
         return blockInCache[0] != -1 && blockInCache[1] != -1;
     }
 
@@ -209,12 +218,10 @@ public class BandIntTileReader {
 
     private long translate(long value) {
         return value * maxValueNative / maxValue;
-        // return ((value << nativeDtbits) >>> dtbits);
     }
 
     private long detranslate(long value) {
         return value * maxValue / maxValueNative;
-        // return ((value << dtbits) >>> nativeDtbits);
     }
 
     /**
