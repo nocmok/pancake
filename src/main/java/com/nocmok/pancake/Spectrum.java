@@ -1,10 +1,12 @@
 package com.nocmok.pancake;
 
+import java.util.List;
+
 public enum Spectrum {
-    
+
     /** Undefined spectrum */
     NONE("none"),
-    
+
     /** Red */
     R("r"),
 
@@ -30,5 +32,13 @@ public enum Spectrum {
 
     public String getName() {
         return name;
+    }
+
+    public static List<Spectrum> all() {
+        return List.<Spectrum>of(Spectrum.values());
+    }
+
+    public static List<Spectrum> RGB() {
+        return List.of(R, G, B);
     }
 }
