@@ -60,15 +60,15 @@ public abstract class ResamplerBase implements Resampler {
 
         int dtype = options.getIntOr(PancakeConstants.KEY_DATATYPE, Pancake.TYPE_BYTE);
 
-        to.add(Pancake.getDatatypeName(dtype));
+        to.add(Pancake.dtName(dtype));
 
         double[] minMax = GdalHelper.computeMinMax(src);
 
         to.add("-scale");
         to.add(Integer.toString((int) minMax[0]));
         to.add(Integer.toString((int) minMax[1]));
-        to.add(Integer.toString((int) Pancake.getDatatypeMin(dtype)));
-        to.add(Integer.toString((int) Pancake.getDatatypeMax(dtype)));
+        to.add(Integer.toString((int) Pancake.dtMin(dtype)));
+        to.add(Integer.toString((int) Pancake.dtMax(dtype)));
 
         List<String> co = Formats.byName(outFormat).toDriverOptions(options).getAsGdalOptions();
         to.addAll(getAsArgList(co));

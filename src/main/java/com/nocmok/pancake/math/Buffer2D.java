@@ -28,7 +28,7 @@ public interface Buffer2D {
     }
 
     public static Buffer2D arrange(int xsize, int ysize, int dtype) {
-        ByteBuffer buf = ByteBuffer.allocateDirect(xsize * ysize * Pancake.getDatatypeSizeBytes(dtype));
+        ByteBuffer buf = ByteBuffer.allocateDirect(xsize * ysize * Pancake.dtBytes(dtype));
         buf.order(ByteOrder.nativeOrder());
         return new MatBuffer2D(buf, xsize, ysize, dtype);
     }

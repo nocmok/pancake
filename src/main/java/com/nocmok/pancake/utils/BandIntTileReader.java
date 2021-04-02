@@ -77,25 +77,25 @@ public class BandIntTileReader {
      *                   converted
      */
     public BandIntTileReader(PancakeBand pnkBand, int blockXSize, int blockYSize, int datatype) {
-        if (!Pancake.isIntegerDatatype(datatype)) {
+        if (!Pancake.isInt(datatype)) {
             throw new UnsupportedOperationException(
-                    "expected integer datatype, but " + Pancake.getDatatypeName(datatype) + " was provided");
+                    "expected integer datatype, but " + Pancake.dtName(datatype) + " was provided");
         }
-        if (!Pancake.isIntegerDatatype(pnkBand.getRasterDatatype())) {
+        if (!Pancake.isInt(pnkBand.getRasterDatatype())) {
             throw new UnsupportedOperationException(
-                    "expected integer datatype, but " + Pancake.getDatatypeName(datatype) + " was provided");
+                    "expected integer datatype, but " + Pancake.dtName(datatype) + " was provided");
         }
 
         this.pnkband = pnkBand;
 
         this.datatype = datatype;
         this.nativeDatatype = pnkBand.getRasterDatatype();
-        this.nativeDtBytesSize = Pancake.getDatatypeSizeBytes(pnkband.getRasterDatatype());
+        this.nativeDtBytesSize = Pancake.dtBytes(pnkband.getRasterDatatype());
 
-        this.maxValue = (int) Pancake.getDatatypeMax(datatype);// (int) Math.pow(256,
+        this.maxValue = (int) Pancake.dtMax(datatype);// (int) Math.pow(256,
                                                                // Pancake.getDatatypeSizeBytes(datatype)) - 1;
         this.minValue = 0;
-        this.maxValueNative = (int) Pancake.getDatatypeMax(nativeDatatype);// (int) Math.pow(256,
+        this.maxValueNative = (int) Pancake.dtMax(nativeDatatype);// (int) Math.pow(256,
                                                                            // Pancake.getDatatypeSizeBytes(nativeDatatype))
                                                                            // - 1;
         this.minValueNative = 0;
@@ -106,7 +106,7 @@ public class BandIntTileReader {
         this.blocksInCol = (pnkband.getYSize() + blockYSize - 1) / blockYSize;
         this.blocksInRow = (pnkband.getXSize() + blockXSize - 1) / blockXSize;
 
-        this.blockByteSize = blockXSize * blockYSize * Pancake.getDatatypeSizeBytes(pnkband.getRasterDatatype());
+        this.blockByteSize = blockXSize * blockYSize * Pancake.dtBytes(pnkband.getRasterDatatype());
         this.blockCache = ByteBuffer.allocateDirect(blockByteSize);
         this.blockCache.order(ByteOrder.nativeOrder());
     }

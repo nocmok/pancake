@@ -21,10 +21,10 @@ public interface ComplexBuffer {
     /**
      * Getter.
      * 
-     * @param t
+     * @param i
      * @return
      */
-    public double im(int t);
+    public double im(int i);
 
     /**
      * Setter.

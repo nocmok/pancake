@@ -9,8 +9,8 @@ import java.util.Map;
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.utils.Rectangle;
-import com.nocmok.pancake.utils.IntBufferedBand;
-import com.nocmok.pancake.utils.NormalizedBufferedBand;
+import com.nocmok.pancake.utils.BandIntTileReader;
+import com.nocmok.pancake.utils.BandFloatTileReader;
 import com.nocmok.pancake.PancakeBand;
 
 public class Brovey implements Fusor {
@@ -68,9 +68,9 @@ public class Brovey implements Fusor {
         }
     }
 
-    private void _fuseFloat(Map<Spectrum, NormalizedBufferedBand> dst, Map<Spectrum, NormalizedBufferedBand> src,
+    private void _fuseFloat(Map<Spectrum, BandFloatTileReader> dst, Map<Spectrum, BandFloatTileReader> src,
             Rectangle region) {
-        List<NormalizedBufferedBand> allBands = new ArrayList<>();
+        List<BandFloatTileReader> allBands = new ArrayList<>();
         allBands.addAll(dst.values());
         allBands.addAll(src.values());
 
@@ -111,8 +111,8 @@ public class Brovey implements Fusor {
         b.flushCache();
     }
 
-    private void _fuseInt(Map<Spectrum, IntBufferedBand> dst, Map<Spectrum, IntBufferedBand> src, Rectangle region) {
-        List<IntBufferedBand> allBands = new ArrayList<>();
+    private void _fuseInt(Map<Spectrum, BandIntTileReader> dst, Map<Spectrum, BandIntTileReader> src, Rectangle region) {
+        List<BandIntTileReader> allBands = new ArrayList<>();
         allBands.addAll(dst.values());
         allBands.addAll(src.values());
 
@@ -125,7 +125,7 @@ public class Brovey implements Fusor {
         var b0 = src.get(Spectrum.B);
         var pa = src.get(Spectrum.PA);
 
-        long maxValue = pa.getAbsoluteMaxValue();
+        long maxValue = pa.getMaxValue();
         long rFactor = (long) (maxValue * rWeight);
         long gFactor = (long) (maxValue * gWeight);
         long bFactor = (long) (maxValue * bWeight);
@@ -137,6 +137,7 @@ public class Brovey implements Fusor {
                 int blockY = yBlock;
 
                 allBands.forEach(band -> band.cacheBlock(blockX, blockY));
+                
                 int blockSize = pa.blockXSize(xBlock) * pa.blockYSize(yBlock);
 
                 for (int i = 0; i < blockSize; ++i) {
@@ -165,7 +166,7 @@ public class Brovey implements Fusor {
 
         boolean useIntegerImplementaion = true;
         for (var band : allBands) {
-            if (!Pancake.isIntegerDatatype(band.getRasterDatatype())) {
+            if (!Pancake.isInt(band.getRasterDatatype())) {
                 useIntegerImplementaion = false;
                 break;
             }
@@ -174,21 +175,21 @@ public class Brovey implements Fusor {
         if (useIntegerImplementaion) {
             List<Integer> allDatatypes = new ArrayList<>();
             allBands.forEach(band -> allDatatypes.add(band.getRasterDatatype()));
-            int commonDt = Pancake.getBiggestDatatype(allDatatypes);
+            int commonDt = Pancake.largerDt(allDatatypes);
 
-            Map<Spectrum, IntBufferedBand> dstInt = new HashMap<>();
-            Map<Spectrum, IntBufferedBand> srcInt = new HashMap<>();
+            Map<Spectrum, BandIntTileReader> dstInt = new HashMap<>();
+            Map<Spectrum, BandIntTileReader> srcInt = new HashMap<>();
 
-            dst.forEach((spect, band) -> dstInt.put(spect, new IntBufferedBand(band, commonDt)));
-            src.forEach((spect, band) -> srcInt.put(spect, new IntBufferedBand(band, commonDt)));
+            dst.forEach((spect, band) -> dstInt.put(spect, new BandIntTileReader(band, commonDt)));
+            src.forEach((spect, band) -> srcInt.put(spect, new BandIntTileReader(band, commonDt)));
 
             _fuseInt(dstInt, srcInt, region);
         } else {
-            Map<Spectrum, NormalizedBufferedBand> dstNorm = new HashMap<>();
-            Map<Spectrum, NormalizedBufferedBand> srcNorm = new HashMap<>();
+            Map<Spectrum, BandFloatTileReader> dstNorm = new HashMap<>();
+            Map<Spectrum, BandFloatTileReader> srcNorm = new HashMap<>();
 
-            dst.forEach((spect, band) -> dstNorm.put(spect, new NormalizedBufferedBand(band)));
-            src.forEach((spect, band) -> srcNorm.put(spect, new NormalizedBufferedBand(band)));
+            dst.forEach((spect, band) -> dstNorm.put(spect, new BandFloatTileReader(band)));
+            src.forEach((spect, band) -> srcNorm.put(spect, new BandFloatTileReader(band)));
 
             _fuseFloat(dstNorm, srcNorm, region);
         }

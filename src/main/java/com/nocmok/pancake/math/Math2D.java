@@ -118,16 +118,35 @@ public class Math2D {
         Mat srcMat = matFromBuffer2D(src);
         Mat dstMat = matFromBuffer2D(dst);
         if (src.datatype() == dtype) {
-            srcMat.convertTo(dstMat, dtype);
-        } else if (Pancake.getDatatypeMax(dtype) > Pancake.getDatatypeMax(src.datatype())) {
-            double scale = Pancake.getDatatypeMax(dtype) / Pancake.getDatatypeMax(src.datatype());
+            srcMat.convertTo(dstMat, dstMat.depth());
+        } else if (Pancake.dtMax(dtype) > Pancake.dtMax(src.datatype())) {
+            double scale = Pancake.dtMax(dtype) / Pancake.dtMax(src.datatype());
             Core.multiply(srcMat, new Scalar(scale), dstMat);
-            dstMat.convertTo(dstMat, dtype);
+            dstMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype));
         } else {
-            double scale = Pancake.getDatatypeMax(src.datatype()) / Pancake.getDatatypeMax(src.datatype());
+            double scale = Pancake.dtMax(src.datatype()) / Pancake.dtMax(src.datatype());
             Core.divide(srcMat, new Scalar(scale), dstMat);
-            dstMat.convertTo(dstMat, dtype);
+            dstMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype));
         }
+    }
+
+    /**
+     * 
+     * @param src
+     * @param dtype
+     * @param dst
+     * @param oldMin
+     * @param oldMax
+     * @param newMin
+     * @param newMax
+     */
+    public void convertAndScale(Buffer2D src, int dtype, Buffer2D dst, double oldMin, double oldMax, double newMin,
+            double newMax) {
+        double alpha = (newMax - newMin) / (oldMax - oldMin);
+        double beta = newMin - oldMin * alpha;
+        Mat srcMat = matFromBuffer2D(src);
+        Mat dstMat = matFromBuffer2D(dst);
+        srcMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype), alpha, beta);
     }
 
     public Stat stat(Buffer2D buf) {
@@ -159,5 +178,18 @@ public class Math2D {
 
     public void fill(Buffer2D buf, double scalar) {
         buf.mat().setTo(new Scalar(scalar));
+    }
+
+    /** */
+    public void normalize(Buffer2D buf, double min, double max) {
+        Mat mat = matFromBuffer2D(buf);
+        Core.normalize(mat, mat, min, max, Core.NORM_MINMAX);
+    }
+
+    /** */
+    public void normalize(Buffer2D src, Buffer2D dst, double min, double max) {
+        Mat srcMat = matFromBuffer2D(src);
+        Mat dstMat = matFromBuffer2D(dst);
+        Core.normalize(srcMat, dstMat, min, max, Core.NORM_MINMAX);
     }
 }

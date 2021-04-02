@@ -89,6 +89,10 @@ public class HPFM implements Fusor {
                 band.getNativeDatatype());
     }
 
+    /** TODO */
+    private void validateFilter() {
+    }
+
     private void _fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src,
             Rectangle region) {
 
@@ -131,22 +135,24 @@ public class HPFM implements Fusor {
                 Buffer2D paBuf = buffer2dFromBandCache(pa);
                 math2d.convertAndScale(paBuf, dtConversion.get(paBuf.datatype()), paBuf);
                 math2d.convolve(paBuf, this.filter, convBuf);
+
                 Iterator<BandIntTileReader> ms0It = ms0.iterator();
                 Iterator<BandIntTileReader> msIt = ms.iterator();
                 while (ms0It.hasNext() && msIt.hasNext()) {
                     Buffer2D ms0Buf = buffer2dFromBandCache(ms0It.next());
                     Buffer2D msBuf = buffer2dFromBandCache(msIt.next());
-                    double scale = Pancake.getDatatypeMax(ms0Buf.datatype()) / Pancake.getDatatypeMax(paBuf.datatype());
-                    math2d.convert(convBuf, fuseBuf, scale, 0.0);
-                    math2d.sum(fuseBuf, ms0Buf, fuseBuf);
+
+                    math2d.convertAndScale(ms0Buf, fuseBuf.datatype(), fuseBuf, 0, Pancake.dtMax(ms0Buf.datatype()), 0,
+                            Pancake.dtMax(paBuf.datatype()));
+                    math2d.sum(fuseBuf, convBuf, fuseBuf);
+
                     Stat stat = math2d.stat(fuseBuf);
                     if ((stat.max() - stat.min()) == 0) {
-                        math2d.fill(msBuf, Pancake.getDatatypeMax(msBuf.datatype()));
+                        double placeholder = Pancake.convert(stat.max(), paBuf.datatype(), msBuf.datatype());
+                        math2d.fill(msBuf, placeholder);
                     } else {
-                        double alpha = Pancake.getDatatypeMax(msBuf.datatype()) / (stat.max() - stat.min());
-                        double beta = -stat.min() * Pancake.getDatatypeMax(msBuf.datatype())
-                                / (stat.max() - stat.min());
-                        math2d.convert(fuseBuf, msBuf, alpha, beta);
+                        math2d.convertAndScale(fuseBuf, msBuf.datatype(), msBuf, -Pancake.dtMax(paBuf.datatype()),
+                                2 * Pancake.dtMax(paBuf.datatype()), 0, Pancake.dtMax(msBuf.datatype()));
                     }
                 }
                 for (BandIntTileReader band : ms) {

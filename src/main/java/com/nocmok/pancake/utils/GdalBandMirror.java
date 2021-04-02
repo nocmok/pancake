@@ -24,8 +24,8 @@ public class GdalBandMirror implements PancakeBand {
         this.maxVal = new Double[1];
         band.GetMaximum(maxVal);
         band.GetMinimum(minVal);
-        maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.getDatatypeMax(band.GetRasterDataType()));
-        minVal[0] = Optional.ofNullable(minVal[0]).orElse(Pancake.getDatatypeMin(band.GetRasterDataType()));
+        maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.dtMax(band.GetRasterDataType()));
+        minVal[0] = Optional.ofNullable(minVal[0]).orElse(Pancake.dtMin(band.GetRasterDataType()));
     }
 
     @Override

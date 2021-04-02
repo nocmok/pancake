@@ -25,7 +25,7 @@ public class HistogramMatching {
 
         private static boolean useArray(int dtype) {
             int sizeThreshold = 65536;
-            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            int size = (int) Math.pow(256, Pancake.dtBytes(dtype));
             return size <= sizeThreshold;
         }
 
@@ -65,9 +65,9 @@ public class HistogramMatching {
 
         HistogramArray(int dtype) {
             this.dtype = dtype;
-            this.minVal = (int) Pancake.getDatatypeMin(dtype);
-            this.maxVal = (int) Pancake.getDatatypeMax(dtype);
-            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            this.minVal = (int) Pancake.dtMin(dtype);
+            this.maxVal = (int) Pancake.dtMax(dtype);
+            int size = (int) Math.pow(256, Pancake.dtBytes(dtype));
             hist = new int[size];
             scale = 1f;
         }
@@ -131,9 +131,9 @@ public class HistogramMatching {
 
         HistogramMap(int dtype) {
             this.dtype = dtype;
-            this.size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
-            this.minVal = (long) Pancake.getDatatypeMin(dtype);
-            this.maxVal = (long) Pancake.getDatatypeMax(dtype);
+            this.size = (int) Math.pow(256, Pancake.dtBytes(dtype));
+            this.minVal = (long) Pancake.dtMin(dtype);
+            this.maxVal = (long) Pancake.dtMax(dtype);
             hist = new HashMap<>();
             scale = 1f;
         }
@@ -193,7 +193,7 @@ public class HistogramMatching {
 
         private static boolean useArray(int dtype) {
             int sizeThreshold = 65536;
-            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            int size = (int) Math.pow(256, Pancake.dtBytes(dtype));
             return size <= sizeThreshold;
         }
 
@@ -221,9 +221,9 @@ public class HistogramMatching {
 
         LookupArray(int dtype) {
             this.dtype = dtype;
-            this.minVal = (int) Pancake.getDatatypeMin(dtype);
-            this.maxVal = (int) Pancake.getDatatypeMax(dtype);
-            int size = (int) Math.pow(256, Pancake.getDatatypeSizeBytes(dtype));
+            this.minVal = (int) Pancake.dtMin(dtype);
+            this.maxVal = (int) Pancake.dtMax(dtype);
+            int size = (int) Math.pow(256, Pancake.dtBytes(dtype));
             lookup = new int[size];
         }
 
@@ -265,8 +265,8 @@ public class HistogramMatching {
 
         public LookupMap(int dtype) {
             this.dtype = dtype;
-            this.minVal = (long) Pancake.getDatatypeMin(dtype);
-            this.maxVal = (long) Pancake.getDatatypeMax(dtype);
+            this.minVal = (long) Pancake.dtMin(dtype);
+            this.maxVal = (long) Pancake.dtMax(dtype);
             this.lookup = new HashMap<>();
         }
 
@@ -324,7 +324,7 @@ public class HistogramMatching {
     }
 
     public Histogram getHistogram(PancakeBand band, int dtype) {
-        if (Pancake.getDatatypeSizeBytes(band.getRasterDatatype()) > 2) {
+        if (Pancake.dtBytes(band.getRasterDatatype()) > 2) {
             throw new UnsupportedOperationException(
                     "histogram matching for images with data type > 16 bit not implemented");
         }
@@ -366,7 +366,7 @@ public class HistogramMatching {
     }
 
     public void matchHistogram(PancakeBand band, Histogram hist) {
-        if (Pancake.getDatatypeSizeBytes(band.getRasterDatatype()) > 2) {
+        if (Pancake.dtBytes(band.getRasterDatatype()) > 2) {
             throw new UnsupportedOperationException(
                     "histogram matching for images with data type > 16 bit not implemented");
         }
@@ -379,7 +379,7 @@ public class HistogramMatching {
     }
 
     public void matchHistogram(PancakeBand src, PancakeBand ref) {
-        if (Pancake.getDatatypeSizeBytes(src.getRasterDatatype()) > 2) {
+        if (Pancake.dtBytes(src.getRasterDatatype()) > 2) {
             throw new UnsupportedOperationException(
                     "histogram matching for images with data type > 16 bit not implemented");
         }

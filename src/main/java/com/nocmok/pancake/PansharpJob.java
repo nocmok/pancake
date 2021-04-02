@@ -159,7 +159,7 @@ public class PansharpJob {
 
     private PancakeOptions populateTargetOptions() {
         PancakeOptions options = new PancakeOptions();
-        options.put(PancakeConstants.KEY_INTERLEAVE, "band");
+        options.put(PancakeConstants.KEY_INTERLEAVE, "pixel");
         options.put(PancakeConstants.KEY_TILED, (isTiled() ? "yes" : "no"));
         options.put(PancakeConstants.KEY_BLOCKXSIZE, blockXSize());
         options.put(PancakeConstants.KEY_BLOCKYSIZE, blockYSize());

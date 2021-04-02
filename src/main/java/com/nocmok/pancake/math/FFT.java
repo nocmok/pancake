@@ -7,9 +7,9 @@ public class FFT {
      * 
      * @param in
      */
-    private static void fft1(ComplexBuffer in, ComplexBuffer out) {
-        if (in.size() != out.size()) {
-            throw new UnsupportedOperationException("in buffer size mismatch out buffer size");
+    private static void _fft1(ComplexBuffer in, ComplexBuffer out) {
+        if (in.size() > out.size()) {
+            throw new IndexOutOfBoundsException("out buffer size < in buffer size");
         }
         if (!PancakeMath.isPow2(in.size())) {
             throw new UnsupportedOperationException("buffer size must be power of 2");
@@ -30,6 +30,10 @@ public class FFT {
                 out.set(i, b);
                 out.set(revI, a);
             }
+        }
+
+        if (n < 2) {
+            return;
         }
 
         for (int len = 2; len <= n; len <<= 1) {
@@ -53,12 +57,13 @@ public class FFT {
 
     /**
      * 1d inverse fft
+     * 
      * @param in
      * @param out
      */
-    private static void ifft1(ComplexBuffer in, ComplexBuffer out) {
-        if (in.size() != out.size()) {
-            throw new UnsupportedOperationException("in buffer size mismatch out buffer size");
+    private static void _ifft1(ComplexBuffer in, ComplexBuffer out) {
+        if (in.size() > out.size()) {
+            throw new IndexOutOfBoundsException("out buffer size < in buffer size");
         }
         if (!PancakeMath.isPow2(in.size())) {
             throw new UnsupportedOperationException("buffer size must be power of 2");
@@ -79,6 +84,10 @@ public class FFT {
                 out.set(i, b);
                 out.set(revI, a);
             }
+        }
+
+        if (n < 2) {
+            return;
         }
 
         for (int len = 2; len <= n; len <<= 1) {
@@ -102,6 +111,40 @@ public class FFT {
         for (int i = 0; i < n; ++i) {
             out.set(i, out.get(i).div(n));
         }
+    }
+
+    public static void fft1(ComplexBuffer in, ComplexBuffer out) {
+        if (out.size() < in.size()) {
+            throw new IndexOutOfBoundsException("out buffer size < in buffer size");
+        }
+        if (!PancakeMath.isPow2(in.size())) {
+            int newLen = 1;
+            while (newLen < in.size()) {
+                newLen <<= 1;
+            }
+            in = PaddedComplexBuffer.pad(in, newLen - in.size());
+            if (out.size() < in.size()) {
+                out = PaddedComplexBuffer.pad(out, newLen);
+            }
+        }
+        _fft1(in, out);
+    }
+
+    public static void ifft1(ComplexBuffer in, ComplexBuffer out) {
+        if (out.size() < in.size()) {
+            throw new IndexOutOfBoundsException("out buffer size < in buffer size");
+        }
+        if (!PancakeMath.isPow2(in.size())) {
+            int newLen = 1;
+            while (newLen < in.size()) {
+                newLen <<= 1;
+            }
+            in = PaddedComplexBuffer.pad(in, newLen - in.size());
+            if (out.size() < in.size()) {
+                out = PaddedComplexBuffer.pad(out, newLen);
+            }
+        }
+        _ifft1(in, out);
     }
 
     /**

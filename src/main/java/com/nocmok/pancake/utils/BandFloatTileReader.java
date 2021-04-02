@@ -65,7 +65,7 @@ public class BandFloatTileReader {
         this.datatype = pnkband.getRasterDatatype();
         this.blockXSize = blockXSize;
         this.blockYSize = blockYSize;
-        this.dataTypeBytesSize = Pancake.getDatatypeSizeBytes(datatype);
+        this.dataTypeBytesSize = Pancake.dtBytes(datatype);
 
         Double[] dtMaxValue = new Double[] { Double.valueOf(0) };
         Double[] dtMinValue = new Double[] { Double.valueOf(0) };
