@@ -19,6 +19,10 @@ public class Shape {
         return ysize;
     }
 
+    public int size(){
+        return xsize * ysize;
+    }
+
     public static Shape of(int xsize, int ysize) {
         return new Shape(xsize, ysize);
     }
