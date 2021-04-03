@@ -1,7 +1,11 @@
 package com.nocmok.pancake.math;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.nocmok.pancake.OpenCvHelper;
 import com.nocmok.pancake.Pancake;
+import com.nocmok.pancake.utils.Rectangle;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -191,5 +195,23 @@ public class Math2D {
         Mat srcMat = matFromBuffer2D(src);
         Mat dstMat = matFromBuffer2D(dst);
         Core.normalize(srcMat, dstMat, min, max, Core.NORM_MINMAX);
+    }
+
+    public void vconcat(List<Buffer2D> src, Buffer2D dst) {
+        List<Mat> mats = new ArrayList<>();
+        for (Buffer2D buf : src) {
+            mats.add(matFromBuffer2D(buf));
+        }
+        Core.vconcat(mats, matFromBuffer2D(dst));
+    }
+
+    public Buffer2D subBuffer(Buffer2D buf, int x0, int y0, int xsize, int ysize) {
+        Mat mat = matFromBuffer2D(buf);
+        Mat submat = mat.submat(y0, y0 + ysize, x0, x0 + xsize);
+        return Buffer2D.wrapMat(submat);
+    }
+
+    public Buffer2D subBuffer(Buffer2D buf, Rectangle roi) {
+        return subBuffer(buf, roi.x0(), roi.y0(), roi.xSize(), roi.ySize());
     }
 }
