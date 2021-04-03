@@ -32,6 +32,10 @@ public interface Buffer2D {
         buf.order(ByteOrder.nativeOrder());
         return new MatBuffer2D(buf, xsize, ysize, dtype);
     }
+
+    static Buffer2D wrapMat(Mat mat) {
+        return new MatBuffer2D(mat);
+    }
 }
 
 class MatBuffer2D implements Buffer2D {
@@ -43,6 +47,10 @@ class MatBuffer2D implements Buffer2D {
     MatBuffer2D(ByteBuffer buf, int xsize, int ysize, int dtype) {
         this.nioBuffer = buf;
         this.mat = new Mat(ysize, xsize, OpenCvHelper.toOpencvDatatype(dtype), nioBuffer);
+    }
+
+    MatBuffer2D(Mat mat) {
+        this.mat = mat;
     }
 
     @Override
@@ -62,15 +70,23 @@ class MatBuffer2D implements Buffer2D {
 
     @Override
     public byte[] getBufferArray() {
-        if (nioBuffer.isDirect()) {
+        if (nioBuffer == null) {
             throw new UnsupportedOperationException(
-                    "cannot get byte array from " + ByteBuffer.class + ", which is direct");
+                    "cannot get byte array as this 2d buffer not backed by array buffer");
+        } else {
+            if (nioBuffer.isDirect()) {
+                throw new UnsupportedOperationException(
+                        "cannot get byte array from " + ByteBuffer.class + ", which is direct");
+            }
+            return nioBuffer.array();
         }
-        return nioBuffer.array();
     }
 
     @Override
     public ByteBuffer getNioBuffer() {
+        if (nioBuffer == null) {
+            throw new UnsupportedOperationException("cannot get buffer as this 2d buffer is not backed");
+        }
         return nioBuffer;
     }
 
