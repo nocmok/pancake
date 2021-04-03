@@ -1,5 +1,7 @@
 package com.nocmok.pancake.fusor;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,7 +15,6 @@ import com.nocmok.pancake.math.Buffer2D;
 import com.nocmok.pancake.math.Math2D;
 import com.nocmok.pancake.math.Math2D.Stat;
 import com.nocmok.pancake.math.Filter2D;
-import com.nocmok.pancake.utils.BandIntTileReader;
 import com.nocmok.pancake.utils.Rectangle;
 import com.nocmok.pancake.utils.Shape;
 
@@ -51,17 +52,13 @@ public class HPFM implements Fusor {
         dtConversion.put(Pancake.TYPE_FLOAT_64, Pancake.TYPE_FLOAT_64);
     }
 
-    public HPFM(Filter2D filter) {
-        this.filter = filter;
+    /** TODO */
+    private void validateFilter(Filter2D filter) {
     }
 
-    @Override
-    public void fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src) {
-        // some validation routine
-        PancakeBand band = src.get(Spectrum.PA);
-        int xsize = band.getXSize();
-        int ysize = band.getYSize();
-        _fuse(dst, src, new Rectangle(0, 0, xsize, ysize));
+    public HPFM(Filter2D filter) {
+        validateFilter(filter);
+        this.filter = filter;
     }
 
     private Shape computeCacheBlockSize(Shape imgsize, Shape tilesize, Shape kernelsize) {
@@ -75,22 +72,41 @@ public class HPFM implements Fusor {
     }
 
     /**
-     * Creates 2d buffer from currently cached block
      * 
      * @param band
-     * @return
+     * @param xsize block width
+     * @param ysize block height
+     * @param block block number
+     * @param buf
      */
-    private Buffer2D buffer2dFromBandCache(BandIntTileReader band) {
-        if (!band.hasBlockInCache()) {
-            throw new RuntimeException("attempt to access band data, that was not cached");
+    private void cacheBlock(PancakeBand band, int xsize, int ysize, int block, ByteBuffer buf) {
+        int blockXSize = xsize;
+        int blockYSize = Integer.min(ysize, band.getYSize() - (block * ysize));
+        try {
+            band.readRasterDirect(0, block * ysize, blockXSize, blockYSize, blockXSize, blockYSize,
+                    band.getRasterDatatype(), buf);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("failed to cache block", e);
         }
-        int[] block = band.getBlockInCache();
-        return Buffer2D.wrap(band.getCache(), band.blockXSize(block[0]), band.blockYSize(block[1]),
-                band.getNativeDatatype());
     }
 
-    /** TODO */
-    private void validateFilter() {
+    /**
+     * 
+     * @param band
+     * @param xsize block width
+     * @param ysize block height
+     * @param block block number
+     * @param buf
+     */
+    private void flushBlock(PancakeBand band, int xsize, int ysize, int block, ByteBuffer buf) {
+        int blockXSize = xsize;
+        int blockYSize = Integer.min(ysize, band.getYSize() - (block * ysize));
+        try {
+            band.writeRasterDirect(0, block * ysize, blockXSize, blockYSize, blockXSize, blockYSize,
+                    band.getRasterDatatype(), buf);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("failed to flush block cache", e);
+        }
     }
 
     private void _fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src,
@@ -101,66 +117,119 @@ public class HPFM implements Fusor {
         Shape kernelsize = Shape.of(filter.getKernel()[0].length, filter.getKernel().length);
         Shape blocksize = computeCacheBlockSize(imgsize, tilesize, kernelsize);
 
-        List<BandIntTileReader> ms0 = new ArrayList<>();
-        List<BandIntTileReader> ms = new ArrayList<>();
-        List<BandIntTileReader> allbands = new ArrayList<>();
-        BandIntTileReader pa = new BandIntTileReader(src.get(Spectrum.PA), blocksize.xsize(), blocksize.ysize());
+        List<PancakeBand> srcMs = new ArrayList<>();
+        List<PancakeBand> dstMs = new ArrayList<>();
+        PancakeBand pa = src.get(Spectrum.PA);
 
         for (Spectrum s : Spectrum.RGB()) {
-            ms0.add(new BandIntTileReader(src.get(s), blocksize.xsize(), blocksize.ysize()));
-            ms.add(new BandIntTileReader(dst.get(s), blocksize.xsize(), blocksize.ysize()));
+            srcMs.add(src.get(s));
+            dstMs.add(dst.get(s));
         }
 
-        allbands.addAll(ms0);
-        allbands.addAll(ms);
-        allbands.add(pa);
+        List<ByteBuffer> paCachePool = new ArrayList<>(3);
+        List<ByteBuffer> paCache = new ArrayList<>();
+        for (int i = 0; i < 3; ++i) {
+            paCachePool.add(ByteBuffer.allocateDirect(blocksize.size() * Pancake.dtBytes(pa.getRasterDatatype()))
+                    .order(ByteOrder.nativeOrder()));
+        }
 
-        Buffer2D convBuf = Buffer2D.arrange(blocksize.xsize(), blocksize.ysize(),
-                convDtMap.get(pa.getNativeDatatype()));
+        int srcMsCacheSize = blocksize.size()
+                * srcMs.stream().mapToInt(b -> Pancake.dtBytes(b.getRasterDatatype())).max().getAsInt();
+        int dstMsCacheSize = blocksize.size()
+                * dstMs.stream().mapToInt(b -> Pancake.dtBytes(b.getRasterDatatype())).max().getAsInt();
+
+        ByteBuffer srcMsCache = ByteBuffer.allocateDirect(srcMsCacheSize).order(ByteOrder.nativeOrder());
+        ByteBuffer dstMsCache = ByteBuffer.allocateDirect(dstMsCacheSize).order(ByteOrder.nativeOrder());
+
+        Buffer2D convBuf = Buffer2D.arrange(blocksize.xsize(), 3 * blocksize.ysize(),
+                convDtMap.get(pa.getRasterDatatype()));
+
         Buffer2D fuseBuf = Buffer2D.arrange(blocksize.xsize(), blocksize.ysize(),
-                convDtMap.get(pa.getNativeDatatype()));
+                convDtMap.get(pa.getRasterDatatype()));
 
         Math2D math2d = new Math2D();
 
-        int blockY0 = pa.toBlockY(region.y0() - 1);
-        int blockX0 = pa.toBlockX(region.x0() - 1);
-        int blockY1 = pa.toBlockY(region.y1() - 1);
-        int blockX1 = pa.toBlockX(region.x1() - 1);
+        int blocks = (pa.getYSize() + blocksize.ysize() - 1) / blocksize.ysize();
 
-        for (int blockY = blockY0; blockY <= blockY1; ++blockY) {
-            for (int blockX = blockX0; blockX <= blockX1; ++blockX) {
-                for (BandIntTileReader band : allbands) {
-                    band.cacheBlock(blockX, blockY);
+        for (int block = 0; block < blocks; ++block) {
+            int ysize = pa.getYSize();
+            int blockXSize = blocksize.xsize();
+            int blockYSize = Integer.min(blocksize.ysize(), ysize - block * blocksize.ysize());
+
+            List<Buffer2D> paBufs = new ArrayList<>();
+            Rectangle roi;
+
+            if (block == 0) {
+                paCache.add(paCachePool.get(0));
+                paCache.add(paCachePool.get(1));
+                cacheBlock(pa, blocksize.xsize(), blocksize.ysize(), block, paCache.get(0));
+                cacheBlock(pa, blocksize.xsize(), blocksize.ysize(), block + 1, paCache.get(1));
+                paBufs.add(Buffer2D.wrap(paCache.get(0), blockXSize, blockYSize, pa.getRasterDatatype()));
+                paBufs.add(Buffer2D.wrap(paCache.get(1), blockXSize, blockYSize, pa.getRasterDatatype()));
+                roi = new Rectangle(0, 0, blockXSize, blockYSize);
+            } else if (block < blocks - 1) {
+                if (paCache.size() < 3) {
+                    paCache.add(paCachePool.get(2));
+                } else {
+                    ByteBuffer buf = paCache.get(0);
+                    paCache.remove(0);
+                    paCache.add(buf);
                 }
-                Buffer2D paBuf = buffer2dFromBandCache(pa);
-                math2d.convertAndScale(paBuf, dtConversion.get(paBuf.datatype()), paBuf);
-                math2d.convolve(paBuf, this.filter, convBuf);
+                cacheBlock(pa, blocksize.xsize(), blocksize.ysize(), block + 1, paCache.get(2));
+                paBufs.add(Buffer2D.wrap(paCache.get(0), blockXSize, blockYSize, pa.getRasterDatatype()));
+                paBufs.add(Buffer2D.wrap(paCache.get(1), blockXSize, blockYSize, pa.getRasterDatatype()));
+                paBufs.add(Buffer2D.wrap(paCache.get(2), blockXSize, blockYSize, pa.getRasterDatatype()));
+                roi = new Rectangle(0, blocksize.ysize(), blockXSize, blockYSize);
+            } else {
+                paBufs.add(Buffer2D.wrap(paCache.get(1), blockXSize, blocksize.ysize(), pa.getRasterDatatype()));
+                paBufs.add(Buffer2D.wrap(paCache.get(2), blockXSize, blockYSize, pa.getRasterDatatype()));
+                roi = new Rectangle(0, blocksize.ysize(), blockXSize, blockYSize);
+            }
 
-                Iterator<BandIntTileReader> ms0It = ms0.iterator();
-                Iterator<BandIntTileReader> msIt = ms.iterator();
-                while (ms0It.hasNext() && msIt.hasNext()) {
-                    Buffer2D ms0Buf = buffer2dFromBandCache(ms0It.next());
-                    Buffer2D msBuf = buffer2dFromBandCache(msIt.next());
+            math2d.vconcat(paBufs, convBuf);
+            math2d.convert(convBuf, convDtMap.get(pa.getRasterDatatype()), convBuf);
+            math2d.convolve(convBuf, this.filter, convBuf);
+            Buffer2D convRoi = math2d.subBuffer(convBuf, roi);
 
-                    math2d.convertAndScale(ms0Buf, fuseBuf.datatype(), fuseBuf, 0, Pancake.dtMax(ms0Buf.datatype()), 0,
-                            Pancake.dtMax(paBuf.datatype()));
-                    math2d.sum(fuseBuf, convBuf, fuseBuf);
+            Iterator<PancakeBand> srcMsIt = srcMs.iterator();
+            Iterator<PancakeBand> dstMsIt = dstMs.iterator();
 
-                    Stat stat = math2d.stat(fuseBuf);
-                    if ((stat.max() - stat.min()) == 0) {
-                        double placeholder = Pancake.convert(stat.max(), paBuf.datatype(), msBuf.datatype());
-                        math2d.fill(msBuf, placeholder);
-                    } else {
-                        math2d.convertAndScale(fuseBuf, msBuf.datatype(), msBuf, -Pancake.dtMax(paBuf.datatype()),
-                                2 * Pancake.dtMax(paBuf.datatype()), 0, Pancake.dtMax(msBuf.datatype()));
-                    }
+            while (srcMsIt.hasNext() && dstMsIt.hasNext()) {
+                PancakeBand srcMsBand = srcMsIt.next();
+                PancakeBand dstMsBand = dstMsIt.next();
+
+                cacheBlock(srcMsBand, blocksize.xsize(), blocksize.ysize(), block, srcMsCache);
+                cacheBlock(dstMsBand, blocksize.xsize(), blocksize.ysize(), block, dstMsCache);
+
+                Buffer2D srcBuf = Buffer2D.wrap(srcMsCache, blockXSize, blockYSize, srcMsBand.getRasterDatatype());
+                Buffer2D dstBuf = Buffer2D.wrap(dstMsCache, blockXSize, blockYSize, dstMsBand.getRasterDatatype());
+
+                math2d.convertAndScale(srcBuf, fuseBuf.datatype(), fuseBuf, 0, Pancake.dtMax(srcBuf.datatype()), 0,
+                        Pancake.dtMax(pa.getRasterDatatype()));
+                math2d.sum(fuseBuf, convRoi, fuseBuf);
+
+                Stat stat = math2d.stat(fuseBuf);
+                if ((stat.max() - stat.min()) == 0) {
+                    double placeholder = Pancake.convert(stat.max(), pa.getRasterDatatype(), dstBuf.datatype());
+                    math2d.fill(dstBuf, placeholder);
+                } else {
+                    math2d.convertAndScale(fuseBuf, dstBuf.datatype(), dstBuf, -Pancake.dtMax(pa.getRasterDatatype()),
+                            2 * Pancake.dtMax(pa.getRasterDatatype()), 0, Pancake.dtMax(dstBuf.datatype()));
                 }
-                for (BandIntTileReader band : ms) {
-                    band.flushCacheAnyway();
-                }
+
+                flushBlock(dstMsBand, blocksize.xsize(), blocksize.ysize(), block, dstMsCache);
             }
         }
 
+    }
+
+    @Override
+    public void fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src) {
+        // some validation routine
+        PancakeBand band = src.get(Spectrum.PA);
+        int xsize = band.getXSize();
+        int ysize = band.getYSize();
+        _fuse(dst, src, new Rectangle(0, 0, xsize, ysize));
     }
 
     @Override
