@@ -180,6 +180,38 @@ public class Math2D {
         Core.multiply(srcMat, new Scalar(scalar), dstMat);
     }
 
+    public void mul(Buffer2D a, Buffer2D b, Buffer2D dst) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat bMat = matFromBuffer2D(b);
+        Mat dstMat = matFromBuffer2D(dst);
+        Core.multiply(aMat, bMat, dstMat, 1f, dstMat.depth());
+    }
+
+    /**
+     * 
+     * @param a
+     * @param dtype  dst dtype
+     * @param b
+     * @param dst
+     * @param oldMin
+     * @param oldMax
+     * @param newMin
+     * @param newMax
+     */
+    public void mul(Buffer2D a, Buffer2D b, Buffer2D dst, double scale, int dtype) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat bMat = matFromBuffer2D(b);
+        Mat dstMat = matFromBuffer2D(dst);
+        Core.multiply(aMat, bMat, dstMat, scale, dtype);
+    }
+
+    public void div(Buffer2D a, Buffer2D b, Buffer2D dst) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat bMat = matFromBuffer2D(b);
+        Mat dstMat = matFromBuffer2D(dst);
+        Core.divide(aMat, bMat, dstMat, 1f, dstMat.depth());
+    }
+
     public void fill(Buffer2D buf, double scalar) {
         buf.mat().setTo(new Scalar(scalar));
     }
@@ -213,5 +245,32 @@ public class Math2D {
 
     public Buffer2D subBuffer(Buffer2D buf, Rectangle roi) {
         return subBuffer(buf, roi.x0(), roi.y0(), roi.xSize(), roi.ySize());
+    }
+
+    public Buffer2D compareEquals(Buffer2D a, Buffer2D b) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat bMat = matFromBuffer2D(b);
+        Mat mask = new Mat();
+        Core.compare(aMat, bMat, mask, Core.CMP_EQ);
+        return Buffer2D.wrapMat(mask);
+    }
+
+    public Buffer2D compareEquals(Buffer2D a, double scalar) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat mask = new Mat();
+        Core.compare(aMat, new Scalar(scalar), mask, Core.CMP_EQ);
+        return Buffer2D.wrapMat(mask);
+    }
+
+    public void fill(Buffer2D buf, double scalar, Buffer2D mask) {
+        Mat mat = matFromBuffer2D(buf);
+        mat.setTo(new Scalar(scalar), matFromBuffer2D(mask));
+    }
+
+    public void replace(Buffer2D buf, double oldVal, double newVal) {
+        Mat mat = matFromBuffer2D(buf);
+        Mat mask = new Mat();
+        Core.compare(mat, new Scalar(oldVal), mask, Core.CMP_EQ);
+        mat.setTo(new Scalar(newVal), mask);
     }
 }
