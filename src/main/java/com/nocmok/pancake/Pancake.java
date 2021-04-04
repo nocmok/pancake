@@ -59,7 +59,7 @@ public class Pancake {
     /**
      * 
      * @param datatype
-     * @return is data type integer 
+     * @return is data type integer
      */
     public static boolean isInt(int datatype) {
         switch (datatype) {
@@ -239,7 +239,39 @@ public class Pancake {
         return largerDt;
     }
 
+    private static boolean isCustomDatatype(int dtype) {
+        switch (dtype) {
+        case TYPE_SBYTE:
+            return true;
+        case TYPE_BYTE:
+        case TYPE_UNKNOWN:
+        case TYPE_UINT_16:
+        case TYPE_UINT_32:
+        case TYPE_INT_32:
+        case TYPE_INT_16:
+        case TYPE_FLOAT_32:
+        case TYPE_FLOAT_64:
+            return false;
+        default:
+            throw new UnsupportedOperationException("unsupported data type " + dtype);
+        }
+    }
+
     public static String dtName(int dtype) {
-        return gdal.GetDataTypeName(dtype);
+        switch (dtype) {
+        case TYPE_BYTE:
+        case TYPE_UNKNOWN:
+        case TYPE_UINT_16:
+        case TYPE_UINT_32:
+        case TYPE_INT_32:
+        case TYPE_INT_16:
+        case TYPE_FLOAT_32:
+        case TYPE_FLOAT_64:
+            return gdal.GetDataTypeName(dtype);
+        case TYPE_SBYTE:
+            return "Pancake.sint8";
+        default:
+            throw new UnsupportedOperationException("unsupported data type " + dtype);
+        }
     }
 }
