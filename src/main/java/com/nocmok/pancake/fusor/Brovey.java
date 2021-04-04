@@ -1,16 +1,19 @@
 package com.nocmok.pancake.fusor;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.Spectrum;
+import com.nocmok.pancake.math.Buffer2D;
+import com.nocmok.pancake.math.Math2D;
 import com.nocmok.pancake.utils.Rectangle;
-import com.nocmok.pancake.utils.BandIntTileReader;
-import com.nocmok.pancake.utils.BandFloatTileReader;
+
 import com.nocmok.pancake.PancakeBand;
 
 public class Brovey implements Fusor {
@@ -68,98 +71,115 @@ public class Brovey implements Fusor {
         }
     }
 
-    private void _fuseFloat(Map<Spectrum, BandFloatTileReader> dst, Map<Spectrum, BandFloatTileReader> src,
-            Rectangle region) {
-        List<BandFloatTileReader> allBands = new ArrayList<>();
-        allBands.addAll(dst.values());
-        allBands.addAll(src.values());
-
-        var r = dst.get(Spectrum.R);
-        var g = dst.get(Spectrum.G);
-        var b = dst.get(Spectrum.B);
-
-        var r0 = src.get(Spectrum.R);
-        var g0 = src.get(Spectrum.G);
-        var b0 = src.get(Spectrum.B);
-        var pa = src.get(Spectrum.PA);
-
-        for (int yBlock = r0.toBlockY(region.y0()); yBlock < r0.toBlockY(region.y1()); ++yBlock) {
-            for (int xBlock = r0.toBlockX(region.x0()); xBlock < r0.toBlockX(region.x1()); ++xBlock) {
-
-                int blockX = xBlock;
-                int blockY = yBlock;
-
-                allBands.forEach(band -> band.cacheBlock(blockX, blockY));
-                int blockSize = pa.blockXSize(xBlock) * pa.blockYSize(yBlock);
-
-                for (int i = 0; i < blockSize; ++i) {
-                    double pseudoPanchro = r0.get(i) + g0.get(i) + b0.get(i);
-                    if (pseudoPanchro == 0.0) {
-                        continue;
-                    } else {
-                        double correction = pa.get(i) / pseudoPanchro;
-                        r.set(i, r0.get(i) * rWeight * correction);
-                        g.set(i, g0.get(i) * gWeight * correction);
-                        b.set(i, b0.get(i) * bWeight * correction);
-                    }
-                }
-            }
+    private void cacheBlock(PancakeBand band, int xsize, int ysize, int blockX, int blockY, ByteBuffer buf) {
+        int blockXSize = Integer.min(xsize, band.getXSize() - (blockX * xsize));
+        int blockYSize = Integer.min(ysize, band.getYSize() - (blockY * ysize));
+        try {
+            band.readRasterDirect(blockX * xsize, blockY * ysize, blockXSize, blockYSize, blockXSize, blockYSize,
+                    band.getRasterDatatype(), buf);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("failed to cache block", e);
         }
-
-        r.flushCache();
-        g.flushCache();
-        b.flushCache();
     }
 
-    private void _fuseInt(Map<Spectrum, BandIntTileReader> dst, Map<Spectrum, BandIntTileReader> src, Rectangle region) {
-        List<BandIntTileReader> allBands = new ArrayList<>();
+    private void flushBlock(PancakeBand band, int xsize, int ysize, int blockX, int blockY, ByteBuffer buf) {
+        int blockXSize = Integer.min(xsize, band.getXSize() - (blockX * xsize));
+        int blockYSize = Integer.min(ysize, band.getYSize() - (blockY * ysize));
+        try {
+            band.writeRasterDirect(blockX * xsize, blockY * ysize, blockXSize, blockYSize, blockXSize, blockYSize,
+                    band.getRasterDatatype(), buf);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("failed to flush block cache", e);
+        }
+    }
+
+    private void _fuseInt(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src,
+            Rectangle region) {
+        List<PancakeBand> allBands = new ArrayList<>();
         allBands.addAll(dst.values());
         allBands.addAll(src.values());
 
-        var r = dst.get(Spectrum.R);
-        var g = dst.get(Spectrum.G);
-        var b = dst.get(Spectrum.B);
+        List<PancakeBand> srcMs = new ArrayList<>();
+        List<PancakeBand> dstMs = new ArrayList<>();
+        PancakeBand pa = src.get(Spectrum.PA);
 
-        var r0 = src.get(Spectrum.R);
-        var g0 = src.get(Spectrum.G);
-        var b0 = src.get(Spectrum.B);
-        var pa = src.get(Spectrum.PA);
+        for (Spectrum spect : Spectrum.RGB()) {
+            srcMs.add(src.get(spect));
+            dstMs.add(dst.get(spect));
+        }
 
-        long maxValue = pa.getMaxValue();
-        long rFactor = (long) (maxValue * rWeight);
-        long gFactor = (long) (maxValue * gWeight);
-        long bFactor = (long) (maxValue * bWeight);
+        int blockXSize = 0;
+        int blockYSize = 0;
+        for (PancakeBand band : allBands) {
+            blockXSize = Integer.max(blockXSize, band.getBlockXSize());
+            blockYSize = Integer.max(blockYSize, band.getBlockYSize());
+        }
+        int blocksize = blockXSize * blockYSize;
 
-        for (int yBlock = r0.toBlockY(region.y0()); yBlock < r0.toBlockY(region.y1()); ++yBlock) {
-            for (int xBlock = r0.toBlockX(region.x0()); xBlock < r0.toBlockX(region.x1()); ++xBlock) {
+        int xsize = pa.getXSize();
+        int ysize = pa.getYSize();
+        int blockY0 = 0;
+        int blockX0 = 0;
+        int blockY1 = (ysize + blockYSize - 1) / blockYSize;
+        int blockX1 = (xsize + blockXSize - 1) / blockXSize;
 
-                int blockX = xBlock;
-                int blockY = yBlock;
+        ByteBuffer panCache = ByteBuffer.allocateDirect(blocksize * Pancake.dtBytes(pa.getRasterDatatype()))
+                .order(ByteOrder.nativeOrder());
 
-                allBands.forEach(band -> band.cacheBlock(blockX, blockY));
-                
-                int blockSize = pa.blockXSize(xBlock) * pa.blockYSize(yBlock);
+        int largerDstDtBytes = dstMs.stream().mapToInt(b -> Pancake.dtBytes(b.getRasterDatatype())).max().getAsInt();
+        int dstMsCacheSize = blocksize * largerDstDtBytes;
+        ByteBuffer dstMsCache = ByteBuffer.allocateDirect(dstMsCacheSize).order(ByteOrder.nativeOrder());
 
-                for (int i = 0; i < blockSize; ++i) {
-                    long pseudoPanchro = r0.get(i) + g0.get(i) + b0.get(i);
-                    if (pseudoPanchro == 0) {
-                        continue;
-                    }
-                    r.set(i, r0.get(i) * pa.get(i) / pseudoPanchro * rFactor / maxValue);
-                    g.set(i, g0.get(i) * pa.get(i) / pseudoPanchro * gFactor / maxValue);
-                    b.set(i, b0.get(i) * pa.get(i) / pseudoPanchro * bFactor / maxValue);
+        int largetSrcMsBytes = srcMs.stream().mapToInt(b -> Pancake.dtBytes(b.getRasterDatatype())).max().getAsInt();
+        int srcMsCacheSize = blocksize * largetSrcMsBytes;
+        ByteBuffer srcMsCache = ByteBuffer.allocateDirect(srcMsCacheSize).order(ByteOrder.nativeOrder());
+
+        Map<Spectrum, Buffer2D> srcMsBufs = new EnumMap<>(Spectrum.class);
+        for (Spectrum spect : Spectrum.RGB()) {
+            srcMsBufs.put(spect, Buffer2D.arrange(blockXSize, blockYSize, pa.getRasterDatatype()));
+        }
+        Buffer2D dstMsBuf = Buffer2D.arrange(blockXSize, blockYSize, Pancake.TYPE_FLOAT_64);
+        Buffer2D ratio = Buffer2D.arrange(blockXSize, blockYSize, Pancake.TYPE_FLOAT_64);
+
+        Math2D math2d = new Math2D();
+
+        for (int blockY = blockY0; blockY < blockY1; ++blockY) {
+            for (int blockX = blockX0; blockX < blockX1; ++blockX) {
+                int currBlockXSize = Integer.min(blockXSize, xsize - blockX * blockXSize);
+                int currBlockYSize = Integer.min(blockYSize, ysize - blockY * blockYSize);
+
+                cacheBlock(pa, blockXSize, blockYSize, blockX, blockY, panCache);
+                Buffer2D paBuf = Buffer2D.wrap(panCache, currBlockXSize, currBlockYSize, pa.getRasterDatatype());
+
+                for (Spectrum spect : Spectrum.RGB()) {
+                    cacheBlock(src.get(spect), blockXSize, blockYSize, blockX, blockY, srcMsCache);
+                    Buffer2D tmpBuf = Buffer2D.wrap(srcMsCache, currBlockXSize, currBlockYSize,
+                            src.get(spect).getRasterDatatype());
+                    math2d.convert(tmpBuf, srcMsBufs.get(spect));
+                }
+
+                math2d.fill(ratio, 0f);
+                for (Buffer2D msBuf : srcMsBufs.values()) {
+                    math2d.sum(msBuf, ratio, ratio);
+                }
+                Buffer2D zeros = math2d.compareEquals(ratio, 0f);
+                math2d.div(paBuf, ratio, ratio);
+                math2d.fill(ratio, 0f, zeros);
+
+                for (Spectrum spect : Spectrum.RGB()) {
+                    math2d.mul(ratio, srcMsBufs.get(spect), dstMsBuf);
+                    math2d.convertAndScale(dstMsBuf, dst.get(spect).getRasterDatatype(),
+                            Buffer2D.wrap(dstMsCache, currBlockXSize, currBlockYSize,
+                                    dst.get(spect).getRasterDatatype()),
+                            0, Pancake.dtMax(paBuf.datatype()), 0, Pancake.dtMax(dst.get(spect).getRasterDatatype()));
+                    flushBlock(dst.get(spect), blockXSize, blockYSize, blockX, blockY, dstMsCache);
                 }
             }
         }
-
-        r.flushCache();
-        g.flushCache();
-        b.flushCache();
     }
 
     private void _fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src,
             Rectangle region) {
-
         List<PancakeBand> allBands = new ArrayList<>();
         allBands.addAll(dst.values());
         allBands.addAll(src.values());
@@ -173,25 +193,9 @@ public class Brovey implements Fusor {
         }
 
         if (useIntegerImplementaion) {
-            List<Integer> allDatatypes = new ArrayList<>();
-            allBands.forEach(band -> allDatatypes.add(band.getRasterDatatype()));
-            int commonDt = Pancake.largerDt(allDatatypes);
-
-            Map<Spectrum, BandIntTileReader> dstInt = new HashMap<>();
-            Map<Spectrum, BandIntTileReader> srcInt = new HashMap<>();
-
-            dst.forEach((spect, band) -> dstInt.put(spect, new BandIntTileReader(band, commonDt)));
-            src.forEach((spect, band) -> srcInt.put(spect, new BandIntTileReader(band, commonDt)));
-
-            _fuseInt(dstInt, srcInt, region);
+            _fuseInt(dst, src, region);
         } else {
-            Map<Spectrum, BandFloatTileReader> dstNorm = new HashMap<>();
-            Map<Spectrum, BandFloatTileReader> srcNorm = new HashMap<>();
-
-            dst.forEach((spect, band) -> dstNorm.put(spect, new BandFloatTileReader(band)));
-            src.forEach((spect, band) -> srcNorm.put(spect, new BandFloatTileReader(band)));
-
-            _fuseFloat(dstNorm, srcNorm, region);
+            throw new UnsupportedOperationException("images with floating point data types not supported");
         }
     }
 
