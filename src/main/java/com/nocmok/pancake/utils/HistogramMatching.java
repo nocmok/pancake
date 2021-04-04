@@ -1,8 +1,5 @@
 package com.nocmok.pancake.utils;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
 
@@ -114,71 +111,6 @@ public class HistogramMatching {
 
     }
 
-    /** Up to Int32 / UInt32 */
-    static class HistogramMap extends Histogram {
-
-        private int dtype;
-
-        private Map<Long, Integer> hist;
-
-        private long minVal;
-
-        private long maxVal;
-
-        private int size;
-
-        private double scale;
-
-        HistogramMap(int dtype) {
-            this.dtype = dtype;
-            this.size = (int) Math.pow(256, Pancake.dtBytes(dtype));
-            this.minVal = (long) Pancake.dtMin(dtype);
-            this.maxVal = (long) Pancake.dtMax(dtype);
-            hist = new HashMap<>();
-            scale = 1f;
-        }
-
-        @Override
-        public int get(long sample) {
-            return (int) (scale * hist.getOrDefault(sample, 0));
-        }
-
-        @Override
-        protected void set(long sample, int value) {
-            hist.put(sample, value);
-        }
-
-        @Override
-        protected void add(long sample, int value) {
-            hist.put(sample, hist.getOrDefault(sample, 0) + 1);
-        }
-
-        @Override
-        public int size() {
-            return size;
-        }
-
-        @Override
-        public void setScale(double scale) {
-            this.scale = scale;
-        }
-
-        @Override
-        public long minVal() {
-            return minVal;
-        }
-
-        @Override
-        public long maxVal() {
-            return maxVal;
-        }
-
-        @Override
-        public int datatype() {
-            return dtype;
-        }
-    }
-
     static abstract class LookupTable {
 
         public abstract long get(long sample);
@@ -251,50 +183,6 @@ public class HistogramMatching {
         public int datatype() {
             return dtype;
         }
-    }
-
-    static class LookupMap extends LookupTable {
-
-        private int dtype;
-
-        private long minVal;
-
-        private long maxVal;
-
-        private Map<Long, Long> lookup;
-
-        public LookupMap(int dtype) {
-            this.dtype = dtype;
-            this.minVal = (long) Pancake.dtMin(dtype);
-            this.maxVal = (long) Pancake.dtMax(dtype);
-            this.lookup = new HashMap<>();
-        }
-
-        @Override
-        public long get(long sample) {
-            return lookup.getOrDefault(sample, 0L);
-        }
-
-        @Override
-        public void set(long sample, long value) {
-            lookup.put(sample, value);
-        }
-
-        @Override
-        public long minVal() {
-            return minVal;
-        }
-
-        @Override
-        public long maxVal() {
-            return maxVal;
-        }
-
-        @Override
-        public int datatype() {
-            return dtype;
-        }
-
     }
 
     private LookupTable getLookupTable(Histogram srcHist, Histogram refHist) {
