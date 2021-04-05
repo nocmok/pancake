@@ -2,12 +2,18 @@ import java.io.File
 
 plugins {
     id 'java-library'
+    id 'java-library-distribution'
 }
 
 project.version = '0.1-SNAPSHOT'
 project.group = 'com.nocmok'
-project.ext.jniPath = "${project.getBuildDir()}/jni"
+project.ext.nativePath = "${project.getProjectDir()}/native"
 project.ext.debug = true
+
+compileJava {
+    sourceCompatibility = '1.8'
+    targetCompatibility = '1.8'
+}
 
 repositories {
     mavenCentral()
@@ -19,36 +25,21 @@ repositories {
 dependencies {
     testImplementation(platform('org.junit:junit-bom:5.7.0'))
 	testImplementation 'org.junit.jupiter:junit-jupiter'
-    implementation(name: 'gdal', ext: 'jar')
+    api(name: 'gdal', ext: 'jar')
+    api(name: 'opencv-451', ext: 'jar')
+}
+
+distributions {
+    main {
+        distributionBaseName = 'pancake'
+        contents {
+            from 'native'
+        }
+    }
 }
 
 test {
-    systemProperty('java.library.path', project.ext.jniPath)
+    systemProperty('java.library.path', project.ext.nativePath)
     testLogging.showStandardStreams = project.ext.debug
-
     useJUnitPlatform()
 }
-
-task cleanupJni() {
-    def jniDir = file(project.ext.jniPath)
-    if(jniDir.exists() && !jniDir.isDirectory()){
-        jniDir.delete()
-    }
-    if(jniDir.exists()){
-        for(File f : jniDir.listFiles()){
-            f.delete()
-        }
-    }else{
-        jniDir.mkdir()
-    }
-}
-
-task includeJni(type: Copy) {
-    def src = file("${project.getProjectDir()}/jni")
-    def dst = file(project.ext.jniPath)
-    from(src)
-    into(dst)
-}
-
-cleanupJni.mustRunAfter(build)
-includeJni.mustRunAfter(cleanupJni)
