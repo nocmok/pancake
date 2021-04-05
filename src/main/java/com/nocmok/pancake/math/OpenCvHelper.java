@@ -1,10 +1,12 @@
-package com.nocmok.pancake;
+package com.nocmok.pancake.math;
 
 import java.util.Set;
 
+import com.nocmok.pancake.Pancake;
+
 import org.opencv.core.CvType;
 
-public class OpenCvHelper {
+class OpenCvHelper {
 
     public static int toOpencvDatatype(int pancakeDt) {
         switch (pancakeDt) {
@@ -63,7 +65,6 @@ public class OpenCvHelper {
         throw new UnsupportedOperationException("unknown opencv datat type: " + dtype);
     }
 
-    /** TODO */
     public static int toPancakeDatatype(int opencvDt) {
         switch (baseType(opencvDt)) {
         case CvType.CV_8S:

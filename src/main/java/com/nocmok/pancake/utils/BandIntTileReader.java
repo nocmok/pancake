@@ -40,17 +40,11 @@ public class BandIntTileReader {
     /** Whether block cache was modified */
     private boolean isDirty = false;
 
-    // private int _datatype;
-
     private int nativeDtBytesSize;
 
     private long maxValue;
 
-    private long minValue;
-
     private long maxValueNative;
-
-    private long minValueNative;
 
     private int datatype;
 
@@ -92,13 +86,8 @@ public class BandIntTileReader {
         this.nativeDatatype = pnkBand.getRasterDatatype();
         this.nativeDtBytesSize = Pancake.dtBytes(pnkband.getRasterDatatype());
 
-        this.maxValue = (int) Pancake.dtMax(datatype);// (int) Math.pow(256,
-                                                               // Pancake.getDatatypeSizeBytes(datatype)) - 1;
-        this.minValue = 0;
-        this.maxValueNative = (int) Pancake.dtMax(nativeDatatype);// (int) Math.pow(256,
-                                                                           // Pancake.getDatatypeSizeBytes(nativeDatatype))
-                                                                           // - 1;
-        this.minValueNative = 0;
+        this.maxValue = (int) Pancake.dtMax(datatype);
+        this.maxValueNative = (int) Pancake.dtMax(nativeDatatype);
 
         this.blockXSize = Integer.min(blockXSize, pnkBand.getXSize());
         this.blockYSize = Integer.min(blockYSize, pnkBand.getYSize());

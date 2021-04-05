@@ -3,29 +3,18 @@ package com.nocmok.pancake;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.Vector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.nocmok.pancake.fusor.Fusor;
-import com.nocmok.pancake.utils.GdalBandMirror;
 import com.nocmok.pancake.utils.HistogramMatching;
 import com.nocmok.pancake.utils.Pair;
-import com.nocmok.pancake.resampler.OnTheFlyResampler;
-import com.nocmok.pancake.resampler.Resampler;
 import com.nocmok.pancake.utils.PancakeIOException;
-import com.nocmok.pancake.utils.Rectangle;
-import com.nocmok.pancake.utils.PancakeOptions;
 
-import org.gdal.gdal.Band;
-import org.gdal.gdal.Dataset;
 import org.gdal.gdal.Driver;
 import org.gdal.gdal.gdal;
 
@@ -39,15 +28,12 @@ public class PansharpJob {
 
     Fusor _fusor;
 
-    Map<Spectrum, Band> _mapping;
-
-    /**  */
-    List<Dataset> _datasets;
+    Map<Spectrum, PancakeBand> _mapping;
 
     /** may contains duplicates */
-    List<Band> _bands;
+    List<PancakeBand> _bands;
 
-    List<Band> _multispectral;
+    List<PancakeBand> _multispectral;
 
     /**
      * Order in which multispectral bands will be packed in dataset in order to be
@@ -100,7 +86,7 @@ public class PansharpJob {
 
     public static final String JOB_USE_HIST_MATCHING = "job_use_hist_matching";
 
-    PansharpJob(Resampler resampler, Fusor fusor, Map<Spectrum, Band> mapping, PancakeOptions options) {
+    PansharpJob(Resampler resampler, Fusor fusor, Map<Spectrum, PancakeBand> mapping, PancakeOptions options) {
         this._options = new PancakeOptions(options);
         this._resampler = resampler;
         this._fusor = fusor;
@@ -123,14 +109,6 @@ public class PansharpJob {
         _worker = Executors.newFixedThreadPool(numThreads());
 
         _bands = new ArrayList<>(_mapping.values());
-        _datasets = new ArrayList<>();
-        Set<String> datasetSet = new HashSet<>();
-        for (Band band : _bands) {
-            if (!datasetSet.contains(GdalHelper.pathTo(band.GetDataset()))) {
-                _datasets.add(band.GetDataset());
-                datasetSet.add(GdalHelper.pathTo(band.GetDataset()));
-            }
-        }
         _multispectral = new ArrayList<>();
         _multispecBandsPackingOrder = new ArrayList<>();
         _multispecBandsPackingOrder.add(Spectrum.R);
@@ -138,7 +116,7 @@ public class PansharpJob {
         _multispecBandsPackingOrder.add(Spectrum.B);
         _multispecBandsPackingOrder.add(Spectrum.NI);
         for (Spectrum spec : _multispecBandsPackingOrder) {
-            Band band = _mapping.get(spec);
+            PancakeBand band = _mapping.get(spec);
             if (band != null) {
                 _multispectral.add(band);
             }
@@ -148,9 +126,9 @@ public class PansharpJob {
         _resamplingOptions = populateResamplingOptions();
     }
 
-    private void validateMultispectralBands(List<Band> ms) {
-        Band first = ms.get(0);
-        for (Band band : ms) {
+    private void validateMultispectralBands(List<PancakeBand> ms) {
+        PancakeBand first = ms.get(0);
+        for (PancakeBand band : ms) {
             if (band.getXSize() != first.getXSize() || band.getYSize() != first.getYSize()) {
                 throw new RuntimeException("multispectral bands has different resolutions");
             }
@@ -181,18 +159,18 @@ public class PansharpJob {
         return options;
     }
 
-    public Dataset pansharp() {
+    public PancakeDataset pansharp() {
         validateSpatialReferences();
 
         int msXSize = _multispectral.get(0).getXSize();
         int msYSize = _multispectral.get(0).getYSize();
 
-        Map<Spectrum, Band> srcMapping = new EnumMap<>(Spectrum.class);
+        Map<Spectrum, PancakeBand> srcMapping = new EnumMap<>(Spectrum.class);
         srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
 
         if (msXSize != _targetXSize || msYSize != _targetYSize) {
-            Dataset multispectral = resample(_resamplingOptions, Pancake.createTempFile());
-            Iterator<Band> bandsIt = GdalHelper.split(multispectral).iterator();
+            PancakeDataset multispectral = resample(_resamplingOptions, Pancake.createTempFile());
+            Iterator<PancakeBand> bandsIt = multispectral.bands().iterator();
             for (Spectrum spect : _multispecBandsPackingOrder) {
                 if (_mapping.containsKey(spect)) {
                     srcMapping.put(spect, bandsIt.next());
@@ -202,12 +180,12 @@ public class PansharpJob {
             srcMapping.putAll(_mapping);
         }
 
-        Dataset artifact = createTargetDataset(_targetOptions, _targetFile);
+        PancakeDataset artifact = createTargetDataset(_targetOptions, _targetFile);
 
-        Map<Spectrum, Band> dstMapping = new EnumMap<>(Spectrum.class);
-        dstMapping.put(Spectrum.R, artifact.GetRasterBand(1));
-        dstMapping.put(Spectrum.G, artifact.GetRasterBand(2));
-        dstMapping.put(Spectrum.B, artifact.GetRasterBand(3));
+        Map<Spectrum, PancakeBand> dstMapping = new EnumMap<>(Spectrum.class);
+        dstMapping.put(Spectrum.R, artifact.bands().get(0));
+        dstMapping.put(Spectrum.G, artifact.bands().get(1));
+        dstMapping.put(Spectrum.B, artifact.bands().get(2));
 
         if (numThreads() > 1) {
             throw new UnsupportedOperationException("parallel fusion not implemented");
@@ -216,10 +194,10 @@ public class PansharpJob {
         }
 
         if (useHistMatching) {
-            List<Pair<Band, Band>> histMapping = new ArrayList<>();
+            List<Pair<PancakeBand, PancakeBand>> histMapping = new ArrayList<>();
             for (Spectrum spec : _multispecBandsPackingOrder) {
-                Band fused = dstMapping.get(spec);
-                Band source = _mapping.get(spec);
+                PancakeBand fused = dstMapping.get(spec);
+                PancakeBand source = _mapping.get(spec);
                 if (fused != null && source != null) {
                     histMapping.add(Pair.of(fused, source));
                 }
@@ -231,10 +209,10 @@ public class PansharpJob {
         return artifact;
     }
 
-    private void matchHistograms(List<Pair<Band, Band>> mapping) {
+    private void matchHistograms(List<Pair<PancakeBand, PancakeBand>> mapping) {
         HistogramMatching hm = new HistogramMatching();
-        for (Pair<Band, Band> pair : mapping) {
-            hm.matchHistogram(new GdalBandMirror(pair.first()), new GdalBandMirror(pair.second()));
+        for (Pair<PancakeBand, PancakeBand> pair : mapping) {
+            hm.matchHistogram(pair.first(), pair.second());
         }
     }
 
@@ -244,75 +222,40 @@ public class PansharpJob {
     }
 
     /** TODO */
-    private void postProcessArtifact(Dataset artifact) {
+    private void postProcessArtifact(PancakeDataset artifact) {
 
     }
 
-    private Dataset resample(PancakeOptions options, File dst) {
+    private PancakeDataset resample(PancakeOptions options, File dst) {
         PancakeOptions resamplingOptions = options;
-        Dataset vrt = GdalHelper.bundleBandsToVRT(_multispectral, Pancake.createTempFile(), null);
-        Dataset scaled = _resampler.resample(vrt, _targetXSize, _targetYSize, dst, resamplingOptions);
+        PancakeDataset vrt = Pancake.bundle(_multispectral, Pancake.createTempFile(), null);
+        PancakeDataset scaled = _resampler.resample(vrt, _targetXSize, _targetYSize, dst, resamplingOptions);
         if (scaled == null) {
             throw new RuntimeException("failed to create resampled dataset due to error: " + gdal.GetLastErrorMsg());
         }
         return scaled;
     }
 
-    private Dataset createTargetDataset(PancakeOptions options, File dst) {
+    private PancakeDataset createTargetDataset(PancakeOptions options, File dst) {
         PancakeOptions driverOptions = _targetFormat.toDriverOptions(options);
-        Dataset targetDataset = _targetDriver.Create(_targetFile.getAbsolutePath(), _targetXSize, _targetYSize, 3,
-                _targetDataType, new Vector<>(driverOptions.getAsGdalOptions()));
+        PancakeDataset targetDataset = Pancake.create(_targetFormat, _targetFile, _targetXSize, _targetYSize, 3,
+                _targetDataType, driverOptions);
         if (targetDataset == null) {
             throw new PancakeIOException("failed to create destination dataset: " + gdal.GetLastErrorMsg());
         }
         return targetDataset;
     }
 
-    private Map<Spectrum, PancakeBand> remap(Map<Spectrum, Band> mapping) {
-        Map<Spectrum, PancakeBand> pancakeMapping = new HashMap<>();
-        for (Map.Entry<Spectrum, Band> entry : mapping.entrySet()) {
-            PancakeBand pancakeBand = new GdalBandMirror(entry.getValue());
-            pancakeMapping.put(entry.getKey(), pancakeBand);
-        }
-        return pancakeMapping;
-    }
-
-    private void fuse(Map<Spectrum, Band> dstMapping, Map<Spectrum, Band> srcMapping) {
-        Map<Spectrum, PancakeBand> pdstMapping = remap(dstMapping);
-        Map<Spectrum, PancakeBand> psrcMapping = remap(srcMapping);
-        _fusor.fuse(pdstMapping, psrcMapping);
-    }
-
-    private List<Rectangle> sliceRegions() {
-        int blocksPerRow = (_targetXSize + blockXSize() - 1) / blockXSize();
-        int blocksPerCol = (_targetYSize + blockYSize() - 1) / blockYSize();
-        int totalBlocks = blocksPerRow * blocksPerCol;
-        int avgBlocksPerCPU = totalBlocks / numThreads();
-        List<Rectangle> regions = new ArrayList<>();
-        if (avgBlocksPerCPU >= blocksPerRow) {
-            int areaBlockYSize = blocksPerCol / numThreads();
-            int linesCovered = 0;
-            for (int i = 0; i < numThreads(); ++i) {
-                regions.add(new Rectangle(0, linesCovered, _targetXSize,
-                        Integer.min(_targetYSize - linesCovered, areaBlockYSize * blockYSize())));
-                linesCovered += areaBlockYSize * blockYSize();
-            }
-        } else {
-            throw new UnsupportedOperationException("not implemented");
-        }
-        return regions;
-    }
-
-    private void fuseParallel(Map<Spectrum, Band> dstMapping, Map<Spectrum, Band> srcMapping) {
-        throw new UnsupportedOperationException("parrallel fusion not implemented");
+    private void fuse(Map<Spectrum, PancakeBand> dstMapping, Map<Spectrum, PancakeBand> srcMapping) {
+        _fusor.fuse(dstMapping, srcMapping);
     }
 
     public int blockXSize() {
-        return _options.getIntOr(JOB_BLOCKXSIZE, _mapping.get(Spectrum.PA).GetBlockXSize());
+        return _options.getIntOr(JOB_BLOCKXSIZE, _mapping.get(Spectrum.PA).getBlockXSize());
     }
 
     public int blockYSize() {
-        return _options.getIntOr(JOB_BLOCKYSIZE, _mapping.get(Spectrum.PA).GetBlockYSize());
+        return _options.getIntOr(JOB_BLOCKYSIZE, _mapping.get(Spectrum.PA).getBlockYSize());
     }
 
     public int numThreads() {

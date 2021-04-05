@@ -4,10 +4,6 @@ import java.io.File;
 import java.util.Map;
 
 import com.nocmok.pancake.fusor.Fusor;
-import com.nocmok.pancake.resampler.Resampler;
-import com.nocmok.pancake.utils.PancakeOptions;
-
-import org.gdal.gdal.Band;
 
 public class PansharpJobBuilder {
 
@@ -17,7 +13,7 @@ public class PansharpJobBuilder {
 
     private Fusor fusor;
 
-    private Map<Spectrum, Band> mapping;
+    private Map<Spectrum, PancakeBand> mapping;
 
     public PansharpJobBuilder() {
         options = new PancakeOptions();
@@ -63,7 +59,7 @@ public class PansharpJobBuilder {
         return this;
     }
 
-    public PansharpJobBuilder withSource(Map<Spectrum, Band> source) {
+    public PansharpJobBuilder withSource(Map<Spectrum, PancakeBand> source) {
         this.mapping = source;
         return this;
     }

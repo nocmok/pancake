@@ -3,7 +3,6 @@ package com.nocmok.pancake.math;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.nocmok.pancake.OpenCvHelper;
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.utils.Rectangle;
 

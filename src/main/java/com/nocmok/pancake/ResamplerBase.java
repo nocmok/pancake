@@ -1,16 +1,10 @@
-package com.nocmok.pancake.resampler;
+package com.nocmok.pancake;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Vector;
-
-import com.nocmok.pancake.Formats;
-import com.nocmok.pancake.GdalHelper;
-import com.nocmok.pancake.Pancake;
-import com.nocmok.pancake.PancakeConstants;
-import com.nocmok.pancake.utils.PancakeOptions;
 
 import org.gdal.gdal.Dataset;
 import org.gdal.gdal.ProgressCallback;
@@ -42,11 +36,13 @@ public abstract class ResamplerBase implements Resampler {
     }
 
     @Override
-    public Dataset resample(Dataset src, int outWidth, int outHeight, File dest, PancakeOptions options) {
+    public PancakeDataset resample(PancakeDataset src, int outWidth, int outHeight, File dest, PancakeOptions options) {
         options = Optional.ofNullable(options).orElse(new PancakeOptions());
 
+        Dataset gdalSrc = GdalHelper.convert(src);
+
         String outFormat = Optional.ofNullable(options.getString(Resampler.OUT_FORMAT))
-                .orElse(src.GetDriver().getShortName());
+                .orElse(gdalSrc.GetDriver().getShortName());
 
         List<String> to = new ArrayList<>();
         to.add("-of");
@@ -62,7 +58,7 @@ public abstract class ResamplerBase implements Resampler {
 
         to.add(Pancake.dtName(dtype));
 
-        double[] minMax = GdalHelper.computeMinMax(src);
+        double[] minMax = GdalHelper.computeMinMax(gdalSrc);
 
         to.add("-scale");
         to.add(Integer.toString((int) minMax[0]));
@@ -73,6 +69,8 @@ public abstract class ResamplerBase implements Resampler {
         List<String> co = Formats.byName(outFormat).toDriverOptions(options).getAsGdalOptions();
         to.addAll(getAsArgList(co));
 
-        return gdal.Translate(dest.getAbsolutePath(), src, new TranslateOptions(new Vector<>(to)), callback);
+        Dataset gdalDst = gdal.Translate(dest.getAbsolutePath(), gdalSrc, new TranslateOptions(new Vector<>(to)),
+                callback);
+        return new GdalDatasetMirror(gdalDst);
     }
 }

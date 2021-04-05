@@ -11,8 +11,9 @@ import org.gdal.gdal.Band;
 import org.gdal.gdal.Dataset;
 import org.gdal.gdal.Driver;
 import org.gdal.gdal.gdal;
+import org.gdal.gdalconst.gdalconst;
 
-public class GdalHelper {
+class GdalHelper {
 
     public static String pathTo(Dataset dataset) {
         Vector<?> fileList = dataset.GetFileList();
@@ -152,5 +153,39 @@ public class GdalHelper {
             minMax[1] = Double.max(minMax[1], currMinMax[1]);
         }
         return minMax;
+    }
+
+    public static int toGdalAccessMode(int pancakeAccess) {
+        switch (pancakeAccess) {
+        case Pancake.ACCESS_READONLY:
+            return gdalconst.GA_ReadOnly;
+        case Pancake.ACCESS_READWRITE:
+            return gdalconst.GA_Update;
+        default:
+            throw new UnsupportedOperationException("unknown access mode " + pancakeAccess);
+        }
+    }
+
+    public static Dataset convert(PancakeDataset ds) {
+        if (ds instanceof GdalDatasetMirror) {
+            return ((GdalDatasetMirror) ds).getUnderlyingDataset();
+        }
+        throw new UnsupportedOperationException("cannot convert dataset of class " + ds.getClass());
+    }
+
+    public static Band convert(PancakeBand band) {
+        if (band instanceof GdalBandMirror) {
+            return ((GdalBandMirror) band).getUnderlyingBand();
+        } else {
+            throw new UnsupportedOperationException("cannot convert band of class " + band.getClass());
+        }
+    }
+
+    public static List<Band> convert(List<PancakeBand> bands) {
+        List<Band> gdalBands = new ArrayList<>();
+        for (PancakeBand band : bands) {
+            gdalBands.add(convert(band));
+        }
+        return gdalBands;
     }
 }

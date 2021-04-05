@@ -1,4 +1,4 @@
-package com.nocmok.pancake.utils;
+package com.nocmok.pancake;
 
 import java.util.ArrayList;
 import java.util.HashMap;

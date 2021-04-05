@@ -1,4 +1,4 @@
-package com.nocmok.pancake.resampler;
+package com.nocmok.pancake;
 
 /**
  * This is just marker interface, which indicates, that resampler will produce

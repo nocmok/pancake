@@ -3,9 +3,12 @@ package com.nocmok.pancake;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
+import java.util.Vector;
 
 import com.nocmok.pancake.utils.PancakeIOException;
 
+import org.gdal.gdal.Dataset;
 import org.gdal.gdal.gdal;
 import org.opencv.core.Core;
 
@@ -36,6 +39,10 @@ public class Pancake {
     public static final int TYPE_FLOAT_64 = 7;
 
     public static final int TYPE_SBYTE = 100;
+
+    public static final int ACCESS_READONLY = 200;
+
+    public static final int ACCESS_READWRITE = 201;
 
     private Pancake() {
 
@@ -239,24 +246,6 @@ public class Pancake {
         return largerDt;
     }
 
-    private static boolean isCustomDatatype(int dtype) {
-        switch (dtype) {
-        case TYPE_SBYTE:
-            return true;
-        case TYPE_BYTE:
-        case TYPE_UNKNOWN:
-        case TYPE_UINT_16:
-        case TYPE_UINT_32:
-        case TYPE_INT_32:
-        case TYPE_INT_16:
-        case TYPE_FLOAT_32:
-        case TYPE_FLOAT_64:
-            return false;
-        default:
-            throw new UnsupportedOperationException("unsupported data type " + dtype);
-        }
-    }
-
     public static String dtName(int dtype) {
         switch (dtype) {
         case TYPE_BYTE:
@@ -273,5 +262,31 @@ public class Pancake {
         default:
             throw new UnsupportedOperationException("unsupported data type " + dtype);
         }
+    }
+
+    public static PancakeDataset open(File file, int access) {
+        Dataset ds = gdal.Open(file.getAbsolutePath(), GdalHelper.toGdalAccessMode(access));
+        if (ds == null) {
+            throw new PancakeIOException(
+                    "failed to read file " + file.getAbsolutePath() + ", due to error " + gdal.GetLastErrorMsg());
+        }
+        return new GdalDatasetMirror(ds);
+    }
+
+    public static PancakeDataset create(Formats format, File file, int xsize, int ysize, int nBands, int dtype,
+            PancakeOptions options) {
+        Dataset gdalDs = format.getDriver().Create(file.getAbsolutePath(), xsize, ysize, nBands, dtype,
+                new Vector<>(options.getAsGdalOptions()));
+        if (gdalDs == null) {
+            throw new PancakeIOException(
+                    "failed to create file " + file.getAbsolutePath() + ", due to error " + gdal.GetLastErrorMsg());
+        }
+        return new GdalDatasetMirror(gdalDs);
+    }
+
+    public static PancakeDataset bundle(List<PancakeBand> bands, File file, PancakeOptions options) {
+        Dataset gdalDataset = GdalHelper.bundleBandsToVRT(GdalHelper.convert(bands), file,
+                Formats.VRT.toDriverOptions(options).getAsGdalOptions());
+        return new GdalDatasetMirror(gdalDataset);
     }
 }

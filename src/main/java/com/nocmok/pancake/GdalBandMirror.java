@@ -1,14 +1,12 @@
-package com.nocmok.pancake.utils;
+package com.nocmok.pancake;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
 import org.gdal.gdal.Band;
+import org.gdal.gdal.Dataset;
 import org.gdal.gdal.gdal;
 import org.gdal.gdalconst.gdalconst;
-
-import com.nocmok.pancake.Pancake;
-import com.nocmok.pancake.PancakeBand;
 
 public class GdalBandMirror implements PancakeBand {
 
@@ -18,6 +16,8 @@ public class GdalBandMirror implements PancakeBand {
 
     private Double[] maxVal;
 
+    private PancakeDataset dataset;
+
     public GdalBandMirror(Band band) {
         this._band = band;
         this.minVal = new Double[1];
@@ -26,6 +26,7 @@ public class GdalBandMirror implements PancakeBand {
         band.GetMinimum(minVal);
         maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.dtMax(band.GetRasterDataType()));
         minVal[0] = Optional.ofNullable(minVal[0]).orElse(Pancake.dtMin(band.GetRasterDataType()));
+        this.dataset = new GdalDatasetMirror(_band.GetDataset());
     }
 
     @Override
@@ -109,11 +110,6 @@ public class GdalBandMirror implements PancakeBand {
     }
 
     @Override
-    public Band getUnderlyingBand() {
-        return _band;
-    }
-
-    @Override
     public int getXSize() {
         return _band.getXSize();
     }
@@ -153,5 +149,13 @@ public class GdalBandMirror implements PancakeBand {
     @Override
     public double minValue() {
         return minVal[0];
+    }
+
+    public Band getUnderlyingBand() {
+        return _band;
+    }
+
+    Dataset dataset() {
+        return _band.GetDataset();
     }
 }

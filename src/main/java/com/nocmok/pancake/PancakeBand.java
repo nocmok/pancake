@@ -2,9 +2,6 @@ package com.nocmok.pancake;
 
 import java.nio.ByteBuffer;
 
-import org.gdal.gdal.Band;
-
-/** Interface for gdal raster band wrappers */
 public interface PancakeBand {
 
         public int readRasterDirect(int xoff, int yoff, int xsize, int ysize, int buf_xsize, int buf_ysize,
@@ -40,8 +37,6 @@ public interface PancakeBand {
         public int getRasterDatatype();
 
         public double getNoData();
-
-        public Band getUnderlyingBand();
 
         public double maxValue();
 

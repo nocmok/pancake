@@ -3,7 +3,6 @@ package com.nocmok.pancake.math;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import com.nocmok.pancake.OpenCvHelper;
 import com.nocmok.pancake.Pancake;
 
 import org.opencv.core.Mat;

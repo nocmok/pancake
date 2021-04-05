@@ -1,4 +1,4 @@
-package com.nocmok.pancake.resampler;
+package com.nocmok.pancake;
 
 import org.gdal.gdal.ProgressCallback;
 

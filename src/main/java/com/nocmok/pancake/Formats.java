@@ -3,8 +3,6 @@ package com.nocmok.pancake;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.nocmok.pancake.utils.PancakeOptions;
-
 import org.gdal.gdal.Driver;
 import org.gdal.gdal.gdal;
 
@@ -12,7 +10,7 @@ public enum Formats {
 
     GTiff("GTiff") {
         @Override
-        public PancakeOptions toDriverOptions(PancakeOptions options) {
+        PancakeOptions toDriverOptions(PancakeOptions options) {
             PancakeOptions driverOptions = new PancakeOptions();
 
             driverOptions.put("INTERLEAVE", options.getStringOr(PancakeConstants.KEY_INTERLEAVE, "BAND"));
@@ -91,11 +89,11 @@ public enum Formats {
         this.driverName = driverName;
     }
 
-    public String driverName() {
+    String driverName() {
         return driverName;
     }
 
-    public Driver getDriver() {
+    Driver getDriver() {
         return gdal.GetDriverByName(driverName);
     }
 
@@ -103,5 +101,5 @@ public enum Formats {
      * Translate pancake specific image option notation, to gdal driver specific
      * creation options notation
      */
-    public abstract PancakeOptions toDriverOptions(PancakeOptions options);
+    abstract PancakeOptions toDriverOptions(PancakeOptions options);
 }
