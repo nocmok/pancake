@@ -125,7 +125,7 @@ public class PansharpJob {
         _bands = new ArrayList<>(_mapping.values());
         _datasets = new ArrayList<>();
         Set<String> datasetSet = new HashSet<>();
-        for (var band : _bands) {
+        for (Band band : _bands) {
             if (!datasetSet.contains(GdalHelper.pathTo(band.GetDataset()))) {
                 _datasets.add(band.GetDataset());
                 datasetSet.add(GdalHelper.pathTo(band.GetDataset()));
@@ -159,7 +159,7 @@ public class PansharpJob {
 
     private PancakeOptions populateTargetOptions() {
         PancakeOptions options = new PancakeOptions();
-        options.put(PancakeConstants.KEY_INTERLEAVE, "pixel");
+        options.put(PancakeConstants.KEY_INTERLEAVE, "band");
         options.put(PancakeConstants.KEY_TILED, (isTiled() ? "yes" : "no"));
         options.put(PancakeConstants.KEY_BLOCKXSIZE, blockXSize());
         options.put(PancakeConstants.KEY_BLOCKYSIZE, blockYSize());
@@ -270,7 +270,7 @@ public class PansharpJob {
 
     private Map<Spectrum, PancakeBand> remap(Map<Spectrum, Band> mapping) {
         Map<Spectrum, PancakeBand> pancakeMapping = new HashMap<>();
-        for (var entry : mapping.entrySet()) {
+        for (Map.Entry<Spectrum, Band> entry : mapping.entrySet()) {
             PancakeBand pancakeBand = new GdalBandMirror(entry.getValue());
             pancakeMapping.put(entry.getKey(), pancakeBand);
         }

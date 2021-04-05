@@ -149,7 +149,7 @@ public class PancakeOptions {
 
     public List<String> getAsGdalOptions() {
         List<String> gdalOptions = new ArrayList<>();
-        for (var entry : options.entrySet()) {
+        for (Map.Entry<String, Object> entry : options.entrySet()) {
             gdalOptions.add(entry.getKey().toString().toUpperCase() + "=" + entry.getValue().toString().toUpperCase());
         }
         return gdalOptions;

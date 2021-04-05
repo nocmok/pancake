@@ -64,7 +64,7 @@ public class Brovey implements Fusor {
         List<PancakeBand> allBands = new ArrayList<>();
         allBands.addAll(dst.values());
         allBands.addAll(src.values());
-        for (var band : allBands) {
+        for (PancakeBand band : allBands) {
             if ((band.getXSize() != paXSize) || (band.getYSize() != paYSize)) {
                 throw new RuntimeException("one of provided band mismatch panchromatic band resolution");
             }
@@ -185,7 +185,7 @@ public class Brovey implements Fusor {
         allBands.addAll(src.values());
 
         boolean useIntegerImplementaion = true;
-        for (var band : allBands) {
+        for (PancakeBand band : allBands) {
             if (!Pancake.isInt(band.getRasterDatatype())) {
                 useIntegerImplementaion = false;
                 break;
