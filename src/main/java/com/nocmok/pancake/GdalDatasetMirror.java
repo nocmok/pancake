@@ -1,6 +1,7 @@
 package com.nocmok.pancake;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +18,9 @@ class GdalDatasetMirror implements PancakeDataset {
     private List<PancakeBand> split(Dataset ds) {
         List<PancakeBand> bands = new ArrayList<>();
         for (int i = 0; i < ds.getRasterCount(); ++i) {
-            bands.add(new GdalBandMirror(ds.GetRasterBand(i + 1)));
+            GdalBandMirror band = new GdalBandMirror(ds.GetRasterBand(i + 1));
+            band.setDataset(this);
+            bands.add(band);
         }
         return bands;
     }
@@ -39,5 +42,10 @@ class GdalDatasetMirror implements PancakeDataset {
 
     public Dataset getUnderlyingDataset(){
         return ds;
+    }
+
+    @Override
+    public void close() throws IOException {
+        ds.delete();        
     }
 }

@@ -1,6 +1,7 @@
 package com.nocmok.pancake;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Iterator;
@@ -59,6 +60,8 @@ public class PansharpJob {
 
     boolean useHistMatching;
 
+    boolean memoryPolite;
+
     PancakeOptions _options;
 
     /** creation options for target artifact */
@@ -86,6 +89,8 @@ public class PansharpJob {
 
     public static final String JOB_USE_HIST_MATCHING = "job_use_hist_matching";
 
+    public static final String JOB_MEMORY_POLITE = "job_memory_polite";
+
     PansharpJob(Resampler resampler, Fusor fusor, Map<Spectrum, PancakeBand> mapping, PancakeOptions options) {
         this._options = new PancakeOptions(options);
         this._resampler = resampler;
@@ -103,6 +108,7 @@ public class PansharpJob {
         this._targetFile = new File(options.getStringOr(JOB_TARGET_PATH, "."));
         this._targetDataType = options.getIntOr(JOB_TARGET_DATATYPE, Pancake.TYPE_BYTE);
         this.useHistMatching = options.getBoolOr(JOB_USE_HIST_MATCHING, true);
+        this.memoryPolite = options.getBoolOr(JOB_MEMORY_POLITE, false);
 
         _targetXSize = _mapping.get(Spectrum.PA).getXSize();
         _targetYSize = _mapping.get(Spectrum.PA).getYSize();
@@ -228,12 +234,16 @@ public class PansharpJob {
 
     private PancakeDataset resample(PancakeOptions options, File dst) {
         PancakeOptions resamplingOptions = options;
-        PancakeDataset vrt = Pancake.bundle(_multispectral, Pancake.createTempFile(), null);
-        PancakeDataset scaled = _resampler.resample(vrt, _targetXSize, _targetYSize, dst, resamplingOptions);
-        if (scaled == null) {
-            throw new RuntimeException("failed to create resampled dataset due to error: " + gdal.GetLastErrorMsg());
+        try (PancakeDataset vrt = Pancake.bundle(_multispectral, Pancake.createTempFile(), null)) {
+            PancakeDataset scaled = _resampler.resample(vrt, _targetXSize, _targetYSize, dst, resamplingOptions);
+            if (scaled == null) {
+                throw new RuntimeException(
+                        "failed to create resampled dataset due to error: " + gdal.GetLastErrorMsg());
+            }
+            return scaled;
+        } catch(IOException e){
+            throw new RuntimeException("failed to free dataset due to i/o error: ", e);
         }
-        return scaled;
     }
 
     private PancakeDataset createTargetDataset(PancakeOptions options, File dst) {
