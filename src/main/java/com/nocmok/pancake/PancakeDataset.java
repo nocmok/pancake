@@ -11,4 +11,8 @@ public interface PancakeDataset extends Closeable {
     public File path();
 
     public void flushCache();
+
+    public int xSize();
+
+    public int ySize();
 }

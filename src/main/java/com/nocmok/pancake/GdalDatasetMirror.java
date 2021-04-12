@@ -48,4 +48,14 @@ class GdalDatasetMirror implements PancakeDataset {
     public void close() throws IOException {
         ds.delete();        
     }
+
+    @Override
+    public int xSize() {
+        return ds.getRasterXSize();
+    }
+
+    @Override
+    public int ySize() {
+        return ds.getRasterYSize();
+    }
 }
