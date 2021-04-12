@@ -1,6 +1,7 @@
 package com.nocmok.pancake;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.gdal.gdal.Driver;
@@ -102,4 +103,8 @@ public enum Formats {
      * creation options notation
      */
     abstract PancakeOptions toDriverOptions(PancakeOptions options);
+
+    public static List<Formats> supportedFormats(){
+        return List.of(GTiff);
+    }
 }
