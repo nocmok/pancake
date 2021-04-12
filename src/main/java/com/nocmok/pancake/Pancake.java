@@ -44,6 +44,8 @@ public class Pancake {
 
     public static final int ACCESS_READWRITE = 201;
 
+    private static int logsFrequency = 10;
+
     private Pancake() {
 
     }
@@ -51,6 +53,18 @@ public class Pancake {
     public static void load() {
         gdal.AllRegister();
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+
+    /**
+     * how much logs per long-run process to produce 
+     * @param logsFrequency
+     */
+    public static void setLogFrequency(int logsFrequency){
+        Pancake.logsFrequency = Integer.min(100, Integer.max(1, logsFrequency));
+    }
+
+    public static int logsFrequency(){
+        return Pancake.logsFrequency;
     }
 
     public static File createTempFile() {

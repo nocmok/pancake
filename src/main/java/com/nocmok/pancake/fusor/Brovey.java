@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.Spectrum;
@@ -15,6 +16,8 @@ import com.nocmok.pancake.math.Math2D;
 import com.nocmok.pancake.utils.Rectangle;
 
 import com.nocmok.pancake.PancakeBand;
+import com.nocmok.pancake.PancakeConstants;
+import com.nocmok.pancake.PancakeProgressListener;
 
 public class Brovey implements Fusor {
 
@@ -26,6 +29,8 @@ public class Brovey implements Fusor {
 
     /** weight of blue band */
     double bWeight = 1.0;
+
+    private PancakeProgressListener listener = PancakeProgressListener.empty;
 
     public Brovey(double rWeight, double gWeight, double bWeight) {
         double max = Collections.max(List.of(rWeight, gWeight, bWeight));
@@ -122,6 +127,7 @@ public class Brovey implements Fusor {
         int blockX0 = 0;
         int blockY1 = (ysize + blockYSize - 1) / blockYSize;
         int blockX1 = (xsize + blockXSize - 1) / blockXSize;
+        int blocksTotal = blockX1 * blockY1;
 
         ByteBuffer panCache = ByteBuffer.allocateDirect(blocksize * Pancake.dtBytes(pa.getRasterDatatype()))
                 .order(ByteOrder.nativeOrder());
@@ -142,6 +148,11 @@ public class Brovey implements Fusor {
         Buffer2D ratio = Buffer2D.arrange(blockXSize, blockYSize, Pancake.TYPE_FLOAT_64);
 
         Math2D math2d = new Math2D();
+
+        int nBlock = 0;
+        int stepSize = (blocksTotal + Pancake.logsFrequency() - 1) / Pancake.logsFrequency();
+        int stepsTotal = (blocksTotal + stepSize - 1) / stepSize;
+        listener.listen(PancakeConstants.PROGRESS_FUSION, 0D, "[Brovey] performing fusion");
 
         for (int blockY = blockY0; blockY < blockY1; ++blockY) {
             for (int blockX = blockX0; blockX < blockX1; ++blockX) {
@@ -174,6 +185,12 @@ public class Brovey implements Fusor {
                             0, Pancake.dtMax(paBuf.datatype()), 0, Pancake.dtMax(dst.get(spect).getRasterDatatype()));
                     flushBlock(dst.get(spect), blockXSize, blockYSize, blockX, blockY, dstMsCache);
                 }
+
+                if (((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= blocksTotal)) {
+                    double progress = (nBlock / stepSize + 1) / (double) stepsTotal;
+                    listener.listen(PancakeConstants.PROGRESS_FUSION, progress, "[Brovey] performing fusion");
+                }
+                ++nBlock;
             }
         }
     }
@@ -210,5 +227,10 @@ public class Brovey implements Fusor {
     public void fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src) {
         validateArgs(dst, src);
         _fuse(dst, src, new Rectangle(0, 0, src.get(Spectrum.PA).getXSize(), src.get(Spectrum.PA).getYSize()));
+    }
+
+    @Override
+    public void setProgressListener(PancakeProgressListener listener) {
+        this.listener = Optional.ofNullable(listener).orElse(PancakeProgressListener.empty);
     }
 }

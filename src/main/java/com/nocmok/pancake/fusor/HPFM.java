@@ -7,9 +7,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
+import com.nocmok.pancake.PancakeConstants;
+import com.nocmok.pancake.PancakeProgressListener;
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.math.Buffer2D;
 import com.nocmok.pancake.math.Math2D;
@@ -21,6 +24,8 @@ import com.nocmok.pancake.utils.Shape;
 public class HPFM implements Fusor {
 
     private Filter2D filter;
+
+    private PancakeProgressListener listener = PancakeProgressListener.empty;
 
     /**
      * Determines which data type to use in order to store convolution result for
@@ -151,6 +156,11 @@ public class HPFM implements Fusor {
 
         int blocks = (pa.getYSize() + blocksize.ysize() - 1) / blocksize.ysize();
 
+        int nBlock = 0;
+        int stepSize = (blocks + Pancake.logsFrequency() - 1) / Pancake.logsFrequency();
+        int stepsTotal = (blocks + stepSize - 1) / stepSize;
+        listener.listen(PancakeConstants.PROGRESS_FUSION, 0D, "[HPFM] performing fusion");
+
         for (int block = 0; block < blocks; ++block) {
             int ysize = pa.getYSize();
             int blockXSize = blocksize.xsize();
@@ -219,6 +229,13 @@ public class HPFM implements Fusor {
 
                 flushBlock(dstMsBand, blocksize.xsize(), blocksize.ysize(), block, dstMsCache);
             }
+
+            if (((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= blocks)) {
+                double progress = (nBlock / stepSize + 1) / (double) stepsTotal;
+                listener.listen(PancakeConstants.PROGRESS_FUSION, progress, "[HPFM] performing fusion");
+            }
+
+            ++nBlock;
         }
 
     }
@@ -237,6 +254,11 @@ public class HPFM implements Fusor {
             Rectangle region) {
         // some validation routine
         _fuse(dst, src, region);
+    }
+
+    @Override
+    public void setProgressListener(PancakeProgressListener listener) {
+        this.listener = Optional.ofNullable(listener).orElse(PancakeProgressListener.empty);
     }
 
 }

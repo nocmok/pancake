@@ -5,6 +5,7 @@ import java.util.Map;
 import com.nocmok.pancake.Spectrum;
 import com.nocmok.pancake.utils.Rectangle;
 import com.nocmok.pancake.PancakeBand;
+import com.nocmok.pancake.PancakeProgressListener;
 
 /**
  * This interface specifies api for objects, that apply fusion algorithm to
@@ -33,4 +34,6 @@ public interface Fusor {
     public void fuse(Map<Spectrum, ? extends PancakeBand> dst, Map<Spectrum, ? extends PancakeBand> src,
             Rectangle area);
 
+
+    public void setProgressListener(PancakeProgressListener listener);
 }

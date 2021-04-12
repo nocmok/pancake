@@ -1,13 +1,23 @@
 package com.nocmok.pancake.utils;
 
+import java.util.Optional;
+
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.PancakeBand;
+import com.nocmok.pancake.PancakeConstants;
+import com.nocmok.pancake.PancakeProgressListener;
 
 /**
  * Limitations: datatypes under UInt32 (exclusive) only integer datatypes only
  * unsigned datatypes
  */
 public class HistogramMatching {
+
+    private PancakeProgressListener listener = PancakeProgressListener.empty;
+
+    public void setProgressListener(PancakeProgressListener listener) {
+        this.listener = Optional.ofNullable(listener).orElse(PancakeProgressListener.empty);
+    }    
 
     public static abstract class Histogram {
 
@@ -223,6 +233,11 @@ public class HistogramMatching {
     }
 
     private Histogram _getHistogram(BandIntTileReader wrapper, Histogram hist) {
+        int totalBlocks = wrapper.getBlocksInCol() * wrapper.getBlocksInRow();
+        int stepSize = (totalBlocks + Pancake.logsFrequency() - 1) / Pancake.logsFrequency();
+        int stepsTotal = (totalBlocks + stepSize - 1) / stepSize;
+        int nBlock = 0;
+
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 wrapper.cacheBlock(blockX, blockY);
@@ -231,6 +246,12 @@ public class HistogramMatching {
                     int sample = (int) wrapper.get(i);
                     hist.add(sample, 1);
                 }
+
+                if(((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= totalBlocks)){
+                    double progress = (nBlock / stepSize + 1) / (double)stepsTotal;
+                    listener.listen(PancakeConstants.PROGRESS_HIST_MATCHING, progress, "[Pancake] getting histogram for: " + wrapper.getUnderlyingBand().dataset().path());
+                }
+                ++nBlock;
             }
         }
         return hist;
@@ -241,6 +262,11 @@ public class HistogramMatching {
     }
 
     private void _applyLookupTable(BandIntTileReader wrapper, LookupTable lookup) {
+        int totalBlocks = wrapper.getBlocksInCol() * wrapper.getBlocksInRow();
+        int stepSize = (totalBlocks + Pancake.logsFrequency() - 1) / Pancake.logsFrequency();
+        int stepsTotal = (totalBlocks + stepSize - 1) / stepSize;
+        int nBlock = 0;
+        
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 int blocksize = wrapper.blockXSize(blockX) * wrapper.blockYSize(blockY);
@@ -248,6 +274,12 @@ public class HistogramMatching {
                 for (int i = 0; i < blocksize; ++i) {
                     wrapper.set(i, lookup.get((int) wrapper.get(i)));
                 }
+
+                if(((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= totalBlocks)){
+                    double progress = (nBlock / stepSize + 1) / (double)stepsTotal;
+                    listener.listen(PancakeConstants.PROGRESS_HIST_MATCHING, progress, "[Pancake] applying lookup table for: " + wrapper.getUnderlyingBand().dataset().path());
+                }
+                ++nBlock;
             }
         }
         wrapper.flushCache();

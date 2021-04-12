@@ -19,4 +19,6 @@ public interface Resampler {
      * @return dataset that contains all bands from source dataset, but upsampled
      */
     public PancakeDataset resample(PancakeDataset src, int outWidth, int outHeight, File dest, PancakeOptions options);
+
+    public void setProgressListener(PancakeProgressListener listener);
 }

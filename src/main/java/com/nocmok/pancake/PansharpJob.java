@@ -69,6 +69,10 @@ public class PansharpJob {
 
     PancakeOptions _resamplingOptions;
 
+    private PancakeProgressListener progressListener = PancakeProgressListener.empty;
+
+    private HistogramMatching histogramMatcher = new HistogramMatching();
+
     public static final String JOB_TARGET_FORMAT = "job_out_format";
 
     public static final String JOB_COMPRESSION = "job_compress";
@@ -174,8 +178,10 @@ public class PansharpJob {
         Map<Spectrum, PancakeBand> srcMapping = new EnumMap<>(Spectrum.class);
         srcMapping.put(Spectrum.PA, _mapping.get(Spectrum.PA));
 
-        if (msXSize != _targetXSize || msYSize != _targetYSize) {
+        if (msXSize != _targetXSize || msYSize != _targetYSize) {     
+            _resampler.setProgressListener(progressListener);
             PancakeDataset multispectral = resample(_resamplingOptions, Pancake.createTempFile());
+            _resampler.setProgressListener(null);
             Iterator<PancakeBand> bandsIt = multispectral.bands().iterator();
             for (Spectrum spect : _multispecBandsPackingOrder) {
                 if (_mapping.containsKey(spect)) {
@@ -186,7 +192,9 @@ public class PansharpJob {
             srcMapping.putAll(_mapping);
         }
 
+        progressListener.listen(PancakeConstants.PROGRESS_TARGET_DATASET_CREATION, 0D, "[Pancake] creating target dataset " + _targetFile.getAbsolutePath());
         PancakeDataset artifact = createTargetDataset(_targetOptions, _targetFile);
+        progressListener.listen(PancakeConstants.PROGRESS_TARGET_DATASET_CREATION, 1D, "[Pancake] target dataset created");
 
         Map<Spectrum, PancakeBand> dstMapping = new EnumMap<>(Spectrum.class);
         dstMapping.put(Spectrum.R, artifact.bands().get(0));
@@ -196,7 +204,9 @@ public class PansharpJob {
         if (numThreads() > 1) {
             throw new UnsupportedOperationException("parallel fusion not implemented");
         } else {
+            _fusor.setProgressListener(progressListener);
             fuse(dstMapping, srcMapping);
+            _fusor.setProgressListener(null);
         }
 
         if (useHistMatching) {
@@ -208,7 +218,9 @@ public class PansharpJob {
                     histMapping.add(Pair.of(fused, source));
                 }
             }
+            histogramMatcher.setProgressListener(progressListener);
             matchHistograms(histMapping);
+            histogramMatcher.setProgressListener(null);
         }
 
         postProcessArtifact(artifact);
@@ -216,9 +228,8 @@ public class PansharpJob {
     }
 
     private void matchHistograms(List<Pair<PancakeBand, PancakeBand>> mapping) {
-        HistogramMatching hm = new HistogramMatching();
         for (Pair<PancakeBand, PancakeBand> pair : mapping) {
-            hm.matchHistogram(pair.first(), pair.second());
+            histogramMatcher.matchHistogram(pair.first(), pair.second());
         }
     }
 
@@ -282,5 +293,9 @@ public class PansharpJob {
 
     public boolean isTiled() {
         return _options.getBoolOr(JOB_TILED, true);
+    }
+
+    public void setProgressListener(PancakeProgressListener listener){
+        this.progressListener = Optional.ofNullable(listener).orElse(PancakeProgressListener.empty);
     }
 }

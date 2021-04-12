@@ -15,15 +15,19 @@ public abstract class ResamplerBase implements Resampler {
 
     private ProgressCallback callback;
 
+    private PancakeProgressListener listener = PancakeProgressListener.empty;
+
     private final String resamplingMethod;
 
     public ResamplerBase(String resamplingMethod) {
-        this(new ProgressCallback(), resamplingMethod);
-    }
-
-    public ResamplerBase(ProgressCallback callback, String resamplingMethod) {
-        this.callback = callback;
         this.resamplingMethod = resamplingMethod;
+        this.callback = new ProgressCallback(){
+            @Override
+            public int run(double dfComplete, String pszMessage) {
+                getListener().listen(PancakeConstants.PROGRESS_RESAMPLING, dfComplete, "[Gdal] performing resampling");
+                return 1;
+            }
+        };
     }
 
     private List<String> getAsArgList(List<String> creationOptions) {
@@ -33,6 +37,15 @@ public abstract class ResamplerBase implements Resampler {
             options.add(option);
         }
         return options;
+    }
+
+    private PancakeProgressListener getListener(){
+        return listener;
+    }
+
+    @Override
+    public void setProgressListener(PancakeProgressListener listener){
+        this.listener = Optional.ofNullable(listener).orElse(PancakeProgressListener.empty);
     }
 
     @Override
