@@ -18,7 +18,7 @@ public class GdalBandMirror implements PancakeBand {
 
     private PancakeDataset dataset;
 
-    public GdalBandMirror(Band band) {
+    GdalBandMirror(Band band) {
         this._band = band;
         this.minVal = new Double[1];
         this.maxVal = new Double[1];
@@ -27,6 +27,10 @@ public class GdalBandMirror implements PancakeBand {
         maxVal[0] = Optional.ofNullable(maxVal[0]).orElse(Pancake.dtMax(band.GetRasterDataType()));
         minVal[0] = Optional.ofNullable(minVal[0]).orElse(Pancake.dtMin(band.GetRasterDataType()));
         this.dataset = new GdalDatasetMirror(_band.GetDataset());
+    }
+
+    void setDataset(PancakeDataset dataset){
+        this.dataset = dataset;
     }
 
     @Override
@@ -155,7 +159,12 @@ public class GdalBandMirror implements PancakeBand {
         return _band;
     }
 
-    Dataset dataset() {
+    Dataset gdalDataset() {
         return _band.GetDataset();
+    }
+
+    @Override
+    public PancakeDataset dataset() {
+        return dataset;
     }
 }

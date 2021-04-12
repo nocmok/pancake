@@ -41,4 +41,6 @@ public interface PancakeBand {
         public double maxValue();
 
         public double minValue();
+
+        public PancakeDataset dataset();
 }
