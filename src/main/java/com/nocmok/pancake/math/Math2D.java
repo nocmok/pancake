@@ -82,10 +82,23 @@ public class Math2D {
     public void sum(Buffer2D a, Buffer2D b, Buffer2D sum, Rectangle region) {
         Mat aMat = matFromBuffer2D(a).submat(region.y0(), region.y1(), region.x0(), region.x1());
         Mat bMat = matFromBuffer2D(b).submat(region.y0(), region.y1(), region.x0(), region.x1());
-        ;
         Mat sumMat = matFromBuffer2D(sum).submat(region.y0(), region.y1(), region.x0(), region.x1());
-        ;
         Core.add(aMat, bMat, sumMat, Mat.ones(sumMat.size(), CvType.CV_8U), sumMat.depth());
+    }
+
+    /**
+     * sum = a + b * scale
+     * 
+     * @param a
+     * @param b
+     * @param scale
+     * @param sum
+     */
+    public void scaleSum(Buffer2D a, Buffer2D b, double scale, Buffer2D sum) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat bMat = matFromBuffer2D(b);
+        Mat sumMat = matFromBuffer2D(sum);
+        Core.addWeighted(aMat, 1d, bMat, scale, 0d, sumMat, sumMat.depth());
     }
 
     public void scaleSum(Buffer2D a, double scale, Buffer2D b, Buffer2D sum) {

@@ -21,22 +21,25 @@ import com.nocmok.pancake.PancakeProgressListener;
 
 public class Brovey implements Fusor {
 
-    /** weight of red band */
-    double rWeight = 1.0;
-
-    /** weight of green band */
-    double gWeight = 1.0;
-
-    /** weight of blue band */
-    double bWeight = 1.0;
+    private Map<Spectrum, Double> weights;
 
     private PancakeProgressListener listener = PancakeProgressListener.empty;
 
     public Brovey(double rWeight, double gWeight, double bWeight) {
         double max = Collections.max(List.of(rWeight, gWeight, bWeight));
-        this.rWeight = rWeight / max;
-        this.gWeight = gWeight / max;
-        this.bWeight = gWeight / max;
+        if (max == 0d) {
+            rWeight = 0d;
+            gWeight = 0d;
+            bWeight = 0d;
+        } else {
+            rWeight = rWeight / max;
+            gWeight = gWeight / max;
+            bWeight = gWeight / max;
+        }
+        weights = new EnumMap<>(Spectrum.class);
+        weights.put(Spectrum.R, rWeight);
+        weights.put(Spectrum.G, gWeight);
+        weights.put(Spectrum.B, bWeight);
     }
 
     public Brovey() {
@@ -168,20 +171,33 @@ public class Brovey implements Fusor {
                 }
 
                 math2d.fill(ratio, 0f);
-                for (Buffer2D msBuf : srcMsBufs.values()) {
-                    math2d.sum(msBuf, ratio, ratio);
+                for (Spectrum spect : Spectrum.RGB()) {
+                    if (weights.get(spect) == 0d) {
+                        continue;
+                    }
+                    math2d.scaleSum(ratio, srcMsBufs.get(spect), weights.get(spect), ratio);
                 }
+
                 Buffer2D zeros = math2d.compareEquals(ratio, 0f);
                 math2d.div(paBuf, ratio, ratio);
                 math2d.fill(ratio, 0f, zeros);
 
                 for (Spectrum spect : Spectrum.RGB()) {
-                    math2d.mul(ratio, srcMsBufs.get(spect), dstMsBuf);
-                    math2d.convertAndScale(dstMsBuf, dst.get(spect).getRasterDatatype(),
-                            Buffer2D.wrap(dstMsCache, blockXSize, blockYSize,
-                                    dst.get(spect).getRasterDatatype()),
-                            0, Pancake.dtMax(paBuf.datatype()), 0, Pancake.dtMax(dst.get(spect).getRasterDatatype()));
-
+                    if (weights.get(spect) == 0d) {
+                        math2d.fill(
+                                Buffer2D.wrap(dstMsCache, blockXSize, blockYSize, dst.get(spect).getRasterDatatype()),
+                                0d);
+                    } else {
+                        math2d.convert(srcMsBufs.get(spect), dstMsBuf);
+                        math2d.mul(ratio, dstMsBuf, dstMsBuf);
+                        if (weights.get(spect) != 1d) {
+                            math2d.mul(dstMsBuf, weights.get(spect), dstMsBuf);
+                        }
+                        math2d.convertAndScale(dstMsBuf, dst.get(spect).getRasterDatatype(),
+                                Buffer2D.wrap(dstMsCache, blockXSize, blockYSize, dst.get(spect).getRasterDatatype()),
+                                0, Pancake.dtMax(paBuf.datatype()), 0,
+                                Pancake.dtMax(dst.get(spect).getRasterDatatype()));
+                    }
                     flushBlock(dst.get(spect), blockXSize, blockYSize, blockX, blockY, dstMsCache);
                 }
 
