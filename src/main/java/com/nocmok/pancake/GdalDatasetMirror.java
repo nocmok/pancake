@@ -11,8 +11,11 @@ class GdalDatasetMirror implements PancakeDataset {
 
     private Dataset ds;
 
+    private Formats format;
+
     public GdalDatasetMirror(Dataset ds) {
         this.ds = ds;
+        this.format = Formats.byName(ds.GetDriver().getShortName());
     }
 
     private List<PancakeBand> split(Dataset ds) {
@@ -57,5 +60,15 @@ class GdalDatasetMirror implements PancakeDataset {
     @Override
     public int ySize() {
         return ds.getRasterYSize();
+    }
+
+    @Override
+    public Formats format() {
+        return format;
+    }
+
+    @Override
+    public String formatString() {
+        return ds.GetDriver().getShortName();
     }
 }

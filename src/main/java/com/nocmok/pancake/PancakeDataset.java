@@ -15,4 +15,8 @@ public interface PancakeDataset extends Closeable {
     public int xSize();
 
     public int ySize();
+
+    public Formats format();
+
+    public String formatString();
 }
