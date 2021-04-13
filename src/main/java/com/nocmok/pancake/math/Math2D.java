@@ -3,6 +3,8 @@ package com.nocmok.pancake.math;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.plaf.synth.Region;
+
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.utils.Rectangle;
 
@@ -77,6 +79,15 @@ public class Math2D {
         Core.add(aMat, bMat, sumMat, Mat.ones(sumMat.size(), CvType.CV_8U), sumMat.depth());
     }
 
+    public void sum(Buffer2D a, Buffer2D b, Buffer2D sum, Rectangle region) {
+        Mat aMat = matFromBuffer2D(a).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        Mat bMat = matFromBuffer2D(b).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        ;
+        Mat sumMat = matFromBuffer2D(sum).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        ;
+        Core.add(aMat, bMat, sumMat, Mat.ones(sumMat.size(), CvType.CV_8U), sumMat.depth());
+    }
+
     public void scaleSum(Buffer2D a, double scale, Buffer2D b, Buffer2D sum) {
         Mat aMat = matFromBuffer2D(a);
         Mat bMat = matFromBuffer2D(b);
@@ -103,7 +114,12 @@ public class Math2D {
     }
 
     public void convertAndScale(Buffer2D src, Buffer2D dst) {
-        convertAndScale(src, dst.datatype(), dst);
+        convertAndScale(src, dst.datatype(), dst,
+                new Rectangle(0, 0, Integer.min(src.xsize(), dst.xsize()), Integer.min(src.ysize(), dst.ysize())));
+    }
+
+    public void convertAndScale(Buffer2D src, Buffer2D dst, Rectangle region) {
+        convertAndScale(src, dst.datatype(), dst, region);
     }
 
     /**
@@ -114,12 +130,13 @@ public class Math2D {
      * @param dtype
      * @param dst
      */
-    public void convertAndScale(Buffer2D src, int dtype, Buffer2D dst) {
+    public void convertAndScale(Buffer2D src, int dtype, Buffer2D dst, Rectangle region) {
         if ((src == dst) && (dtype == dst.datatype())) {
             return;
         }
         Mat srcMat = matFromBuffer2D(src);
         Mat dstMat = matFromBuffer2D(dst);
+        ;
         if (src.datatype() == dtype) {
             srcMat.convertTo(dstMat, dstMat.depth());
         } else if (Pancake.dtMax(dtype) > Pancake.dtMax(src.datatype())) {
@@ -186,6 +203,13 @@ public class Math2D {
         Core.multiply(aMat, bMat, dstMat, 1f, dstMat.depth());
     }
 
+    public void mul(Buffer2D a, Buffer2D b, Buffer2D dst, Rectangle region) {
+        Mat aMat = matFromBuffer2D(a).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        Mat bMat = matFromBuffer2D(b).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        Mat dstMat = matFromBuffer2D(dst).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        Core.multiply(aMat, bMat, dstMat, 1f, dstMat.depth());
+    }
+
     /**
      * 
      * @param a
@@ -208,6 +232,13 @@ public class Math2D {
         Mat aMat = matFromBuffer2D(a);
         Mat bMat = matFromBuffer2D(b);
         Mat dstMat = matFromBuffer2D(dst);
+        Core.divide(aMat, bMat, dstMat, 1f, dstMat.depth());
+    }
+
+    public void div(Buffer2D a, Buffer2D b, Buffer2D dst, Rectangle region) {
+        Mat aMat = matFromBuffer2D(a).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        Mat bMat = matFromBuffer2D(b).submat(region.y0(), region.y1(), region.x0(), region.x1());
+        Mat dstMat = matFromBuffer2D(dst).submat(region.y0(), region.y1(), region.x0(), region.x1());
         Core.divide(aMat, bMat, dstMat, 1f, dstMat.depth());
     }
 
