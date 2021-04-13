@@ -9,15 +9,42 @@ public class GaussianHP implements Filter2D {
 
     public GaussianHP(double sigma) {
         this.sigma = sigma;
-        this.kernel = _getKernel();
+        this.kernel = getKernel(computeSize(sigma), sigma);
     }
 
-    private double[][] _getKernel() {
+    public GaussianHP(double sigma, int size){
+        this.sigma = sigma;
+        this.kernel = getKernel(size, sigma);
+    }
+
+    public GaussianHP(int size){
+        this.sigma = computeSigma(size);
+        this.kernel = getKernel(size, sigma);
+    }
+
+    public static GaussianHP ofSize(int size){
+        size = Integer.max(3, size);
+        if(size % 2 == 0){
+            size += 1;
+        }
+        return new GaussianHP(size);
+    }
+
+    private double computeSigma(int size){
+        double sigma = (double)size / 6;
+        return sigma;
+    }
+
+    private int computeSize(double sigma){
         int n = (int) Math.ceil(6 * sigma);
         if (n % 2 == 0) {
             n += 1;
         }
         n = Integer.max(3, n);
+        return n;
+    }
+
+    private double[][] getKernel(int n, double sigma){
         double[][] kernel = new double[n][n];
 
         double sigma2 = Math.pow(sigma, 2);

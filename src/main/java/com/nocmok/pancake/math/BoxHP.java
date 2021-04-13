@@ -17,6 +17,14 @@ public class BoxHP implements Filter2D {
         this.kernel = _getKernel();
     }
 
+    public static BoxHP ofSize(int size){
+        size = Integer.max(3, size);
+        if(size % 2 == 0){
+            size += 1;
+        }
+        return new BoxHP(size);   
+    }
+
     private double[][] _getKernel() {
         double[][] kernel = new double[size][size];
         for (int y = 0; y < size; ++y) {
