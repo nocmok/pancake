@@ -17,7 +17,7 @@ public class HistogramMatching {
 
     public void setProgressListener(PancakeProgressListener listener) {
         this.listener = Optional.ofNullable(listener).orElse(PancakeProgressListener.empty);
-    }    
+    }
 
     public static abstract class Histogram {
 
@@ -247,9 +247,10 @@ public class HistogramMatching {
                     hist.add(sample, 1);
                 }
 
-                if(((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= totalBlocks)){
-                    double progress = (nBlock / stepSize + 1) / (double)stepsTotal;
-                    listener.listen(PancakeConstants.PROGRESS_HIST_MATCHING, progress, "[Pancake] getting histogram for: " + wrapper.getUnderlyingBand().dataset().path());
+                if (((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= totalBlocks)) {
+                    double progress = (nBlock / stepSize + 1) / (double) stepsTotal;
+                    listener.listen(PancakeConstants.PROGRESS_HIST_MATCHING, progress,
+                            "[Pancake] getting histogram for: " + wrapper.getUnderlyingBand().dataset().path());
                 }
                 ++nBlock;
             }
@@ -266,7 +267,7 @@ public class HistogramMatching {
         int stepSize = (totalBlocks + Pancake.logsFrequency() - 1) / Pancake.logsFrequency();
         int stepsTotal = (totalBlocks + stepSize - 1) / stepSize;
         int nBlock = 0;
-        
+
         for (int blockY = 0; blockY < wrapper.getBlocksInCol(); ++blockY) {
             for (int blockX = 0; blockX < wrapper.getBlocksInRow(); ++blockX) {
                 int blocksize = wrapper.blockXSize(blockX) * wrapper.blockYSize(blockY);
@@ -275,9 +276,10 @@ public class HistogramMatching {
                     wrapper.set(i, lookup.get((int) wrapper.get(i)));
                 }
 
-                if(((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= totalBlocks)){
-                    double progress = (nBlock / stepSize + 1) / (double)stepsTotal;
-                    listener.listen(PancakeConstants.PROGRESS_HIST_MATCHING, progress, "[Pancake] applying lookup table for: " + wrapper.getUnderlyingBand().dataset().path());
+                if (((nBlock + 1) % stepSize == 0) || (nBlock + 1 >= totalBlocks)) {
+                    double progress = (nBlock / stepSize + 1) / (double) stepsTotal;
+                    listener.listen(PancakeConstants.PROGRESS_HIST_MATCHING, progress,
+                            "[Pancake] applying lookup table for: " + wrapper.getUnderlyingBand().dataset().path());
                 }
                 ++nBlock;
             }
@@ -298,6 +300,51 @@ public class HistogramMatching {
         _applyLookupTable(wrapper, lookup);
     }
 
+    private Shape computeBlockSize(Shape nativeBlocksize, Shape imageSize, int dtype) {
+        // int blockXSize = Integer.min(imageSize.xsize(), nativeBlocksize.xsize());
+        // int blockYSize = Integer.min(imageSize.ysize(), nativeBlocksize.ysize());
+        // int bytes = Pancake.dtBytes(dtype);
+        // int blockSize = bytes * blockXSize * blockYSize;
+
+        // /** 512 kb */
+        // int prefferedBlockSize = 512 * 1024;
+        // /** 1 mb */
+        // int maxBlockSize = 1024 * 1024;
+
+        // if (blockSize >= prefferedBlockSize) {
+        // return Shape.of(blockXSize, blockYSize);
+        // }
+
+        // int grow = (prefferedBlockSize + blockSize - 1) / blockSize;
+        // if (grow * blockSize > maxBlockSize) {
+        // grow -= 1;
+        // }
+
+        // if (blockXSize < imageSize.xsize()) {
+        // if (grow * blockXSize >= imageSize.xsize()) {
+        // return computeBlockSize(Shape.of(imageSize.xsize(), blockYSize), imageSize,
+        // dtype);
+        // } else {
+        // List<Integer> sizes = List.of(128, 256, 512);
+        // int bestSize = 512;
+        // for (Integer size : sizes) {
+        // if (size * size * bytes >= prefferedBlockSize) {
+        // bestSize = size;
+        // break;
+        // }
+        // }
+        // blockXSize = bestSize;
+        // blockYSize = bestSize;
+        // }
+        // } else if (blockXSize == imageSize.xsize()) {
+        // blockYSize *= grow;
+        // }
+
+        // return Shape.of(blockXSize, blockYSize);
+
+        return nativeBlocksize;
+    }
+
     public void matchHistogram(PancakeBand src, PancakeBand ref) {
         if (Pancake.dtBytes(src.getRasterDatatype()) > 2) {
             throw new UnsupportedOperationException(
@@ -307,8 +354,14 @@ public class HistogramMatching {
         int srcSize = src.getXSize() * src.getYSize();
         int refSize = ref.getXSize() * ref.getYSize();
 
-        BandIntTileReader srcWrapper = new BandIntTileReader(src);
-        BandIntTileReader refWrapper = new BandIntTileReader(ref, src.getRasterDatatype());
+        Shape srcBlockSize = computeBlockSize(Shape.of(src.getBlockXSize(), src.getBlockYSize()),
+                Shape.of(src.getXSize(), src.getYSize()), src.getRasterDatatype());
+        Shape dstBlockSize = computeBlockSize(Shape.of(src.getBlockXSize(), src.getBlockYSize()),
+                Shape.of(src.getXSize(), src.getYSize()), src.getRasterDatatype());
+
+        BandIntTileReader srcWrapper = new BandIntTileReader(src, srcBlockSize.xsize(), srcBlockSize.ysize());
+        BandIntTileReader refWrapper = new BandIntTileReader(ref, dstBlockSize.xsize(), dstBlockSize.ysize(),
+                src.getRasterDatatype());
 
         Histogram srcHist = Histogram.forDataType(src.getRasterDatatype());
         Histogram refHist = Histogram.forDataType(src.getRasterDatatype());

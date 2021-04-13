@@ -3,8 +3,6 @@ package com.nocmok.pancake.math;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.plaf.synth.Region;
-
 import com.nocmok.pancake.Pancake;
 import com.nocmok.pancake.utils.Rectangle;
 
