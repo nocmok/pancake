@@ -165,17 +165,23 @@ public class Brovey implements Fusor {
 
                 for (Spectrum spect : Spectrum.RGB()) {
                     cacheBlock(src.get(spect), blockXSize, blockYSize, blockX, blockY, srcMsCache);
+
                     Buffer2D tmpBuf = Buffer2D.wrap(srcMsCache, blockXSize, blockYSize,
                             src.get(spect).getRasterDatatype());
-                    math2d.convertAndScale(tmpBuf, srcMsBufs.get(spect));
+
+                    math2d.convertAndScale(tmpBuf, pa.getRasterDatatype(), srcMsBufs.get(spect), Pancake.dtMin(tmpBuf.datatype()),
+                            Pancake.dtMax(tmpBuf.datatype()), 0, Pancake.dtMax(pa.getRasterDatatype()));
                 }
 
                 math2d.fill(ratio, 0f);
                 for (Spectrum spect : Spectrum.RGB()) {
                     if (weights.get(spect) == 0d) {
                         continue;
+                    } else if (weights.get(spect) == 1d) {
+                        math2d.sum(ratio, srcMsBufs.get(spect), ratio);
+                    } else {
+                        math2d.scaleSum(ratio, srcMsBufs.get(spect), weights.get(spect), ratio);
                     }
-                    math2d.scaleSum(ratio, srcMsBufs.get(spect), weights.get(spect), ratio);
                 }
 
                 Buffer2D zeros = math2d.compareEquals(ratio, 0f);
@@ -189,10 +195,10 @@ public class Brovey implements Fusor {
                                 0d);
                     } else {
                         math2d.convert(srcMsBufs.get(spect), dstMsBuf);
-                        math2d.mul(ratio, dstMsBuf, dstMsBuf);
                         if (weights.get(spect) != 1d) {
                             math2d.mul(dstMsBuf, weights.get(spect), dstMsBuf);
                         }
+                        math2d.mul(ratio, dstMsBuf, dstMsBuf);
                         math2d.convertAndScale(dstMsBuf, dst.get(spect).getRasterDatatype(),
                                 Buffer2D.wrap(dstMsCache, blockXSize, blockYSize, dst.get(spect).getRasterDatatype()),
                                 0, Pancake.dtMax(paBuf.datatype()), 0,

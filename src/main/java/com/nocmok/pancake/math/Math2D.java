@@ -125,12 +125,7 @@ public class Math2D {
     }
 
     public void convertAndScale(Buffer2D src, Buffer2D dst) {
-        convertAndScale(src, dst.datatype(), dst,
-                new Rectangle(0, 0, Integer.min(src.xsize(), dst.xsize()), Integer.min(src.ysize(), dst.ysize())));
-    }
-
-    public void convertAndScale(Buffer2D src, Buffer2D dst, Rectangle region) {
-        convertAndScale(src, dst.datatype(), dst, region);
+        convertAndScale(src, dst.datatype(), dst);
     }
 
     /**
@@ -141,23 +136,22 @@ public class Math2D {
      * @param dtype
      * @param dst
      */
-    public void convertAndScale(Buffer2D src, int dtype, Buffer2D dst, Rectangle region) {
+    public void convertAndScale(Buffer2D src, int dtype, Buffer2D dst) {
         if ((src == dst) && (dtype == dst.datatype())) {
             return;
         }
         Mat srcMat = matFromBuffer2D(src);
         Mat dstMat = matFromBuffer2D(dst);
-        ;
         if (src.datatype() == dtype) {
             srcMat.convertTo(dstMat, dstMat.depth());
         } else if (Pancake.dtMax(dtype) > Pancake.dtMax(src.datatype())) {
             double scale = Pancake.dtMax(dtype) / Pancake.dtMax(src.datatype());
-            Core.multiply(srcMat, new Scalar(scale), dstMat);
-            dstMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype));
+            Core.multiply(srcMat, new Scalar(scale), dstMat, 1d, dtype);
+            // dstMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype));
         } else {
             double scale = Pancake.dtMax(src.datatype()) / Pancake.dtMax(src.datatype());
-            Core.divide(srcMat, new Scalar(scale), dstMat);
-            dstMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype));
+            Core.divide(srcMat, new Scalar(scale), dstMat, 1d, dtype);
+            // dstMat.convertTo(dstMat, OpenCvHelper.toOpencvDatatype(dtype));
         }
     }
 
