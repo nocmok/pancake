@@ -25,25 +25,32 @@ public class Brovey implements Fusor {
 
     private PancakeProgressListener listener = PancakeProgressListener.empty;
 
-    public Brovey(double rWeight, double gWeight, double bWeight) {
+    public Brovey(double rWeight, double gWeight, double bWeight, double niWeight) {
         double max = Collections.max(List.of(rWeight, gWeight, bWeight));
         if (max == 0d) {
             rWeight = 0d;
             gWeight = 0d;
             bWeight = 0d;
+            niWeight = 0d;
         } else {
             rWeight = rWeight / max;
             gWeight = gWeight / max;
             bWeight = gWeight / max;
+            niWeight = niWeight / max;
         }
         weights = new EnumMap<>(Spectrum.class);
         weights.put(Spectrum.R, rWeight);
         weights.put(Spectrum.G, gWeight);
         weights.put(Spectrum.B, bWeight);
+        weights.put(Spectrum.NI, niWeight);
+    }
+
+    public Brovey(double rWeight, double gWeight, double bWeight){
+        this(rWeight, gWeight, bWeight, 0d);
     }
 
     public Brovey() {
-        this(1.0, 1.0, 1.0);
+        this(1d, 1d, 1d, 0d);
     }
 
     private void validateDst(Map<Spectrum, ? extends PancakeBand> dst) {
@@ -110,10 +117,17 @@ public class Brovey implements Fusor {
         List<PancakeBand> srcMs = new ArrayList<>();
         List<PancakeBand> dstMs = new ArrayList<>();
         PancakeBand pa = src.get(Spectrum.PA);
+        PancakeBand ni = src.get(Spectrum.NI);
 
         for (Spectrum spect : Spectrum.RGB()) {
             srcMs.add(src.get(spect));
             dstMs.add(dst.get(spect));
+        }
+
+        List<PancakeBand> srcMsAll = new ArrayList<>();
+        srcMsAll.addAll(srcMs);
+        if (ni != null) {
+            srcMsAll.add(ni);
         }
 
         int blockXSize = 0;
@@ -139,7 +153,7 @@ public class Brovey implements Fusor {
         int dstMsCacheSize = blocksize * largerDstDtBytes;
         ByteBuffer dstMsCache = ByteBuffer.allocateDirect(dstMsCacheSize).order(ByteOrder.nativeOrder());
 
-        int largetSrcMsBytes = srcMs.stream().mapToInt(b -> Pancake.dtBytes(b.getRasterDatatype())).max().getAsInt();
+        int largetSrcMsBytes = srcMsAll.stream().mapToInt(b -> Pancake.dtBytes(b.getRasterDatatype())).max().getAsInt();
         int srcMsCacheSize = blocksize * largetSrcMsBytes;
         ByteBuffer srcMsCache = ByteBuffer.allocateDirect(srcMsCacheSize).order(ByteOrder.nativeOrder());
 
@@ -162,6 +176,16 @@ public class Brovey implements Fusor {
 
                 cacheBlock(pa, blockXSize, blockYSize, blockX, blockY, panCache);
                 Buffer2D paBuf = Buffer2D.wrap(panCache, blockXSize, blockYSize, pa.getRasterDatatype());
+                if (ni != null && weights.get(Spectrum.NI) != 0d) {
+                    cacheBlock(ni, blockXSize, blockYSize, blockX, blockY, srcMsCache);
+                    Buffer2D tmpBuf = Buffer2D.wrap(srcMsCache, blockXSize, blockYSize, ni.getRasterDatatype());
+                    Buffer2D niBuf = srcMsBufs.get(Spectrum.R);
+                    math2d.convertAndScale(tmpBuf, pa.getRasterDatatype(), niBuf,
+                            Pancake.dtMin(tmpBuf.datatype()), Pancake.dtMax(tmpBuf.datatype()), 0,
+                            Pancake.dtMax(pa.getRasterDatatype()));
+                    math2d.mul(niBuf, weights.get(Spectrum.NI), niBuf);
+                    math2d.sub(paBuf, niBuf, paBuf);
+                }
 
                 for (Spectrum spect : Spectrum.RGB()) {
                     cacheBlock(src.get(spect), blockXSize, blockYSize, blockX, blockY, srcMsCache);
@@ -169,8 +193,9 @@ public class Brovey implements Fusor {
                     Buffer2D tmpBuf = Buffer2D.wrap(srcMsCache, blockXSize, blockYSize,
                             src.get(spect).getRasterDatatype());
 
-                    math2d.convertAndScale(tmpBuf, pa.getRasterDatatype(), srcMsBufs.get(spect), Pancake.dtMin(tmpBuf.datatype()),
-                            Pancake.dtMax(tmpBuf.datatype()), 0, Pancake.dtMax(pa.getRasterDatatype()));
+                    math2d.convertAndScale(tmpBuf, pa.getRasterDatatype(), srcMsBufs.get(spect),
+                            Pancake.dtMin(tmpBuf.datatype()), Pancake.dtMax(tmpBuf.datatype()), 0,
+                            Pancake.dtMax(pa.getRasterDatatype()));
                 }
 
                 math2d.fill(ratio, 0f);

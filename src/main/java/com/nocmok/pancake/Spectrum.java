@@ -41,4 +41,8 @@ public enum Spectrum {
     public static List<Spectrum> RGB() {
         return List.of(R, G, B);
     }
+
+    public static List<Spectrum> RGBNI(){
+        return List.of(R, G, B, NI);
+    }
 }

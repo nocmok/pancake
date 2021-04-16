@@ -195,6 +195,13 @@ public class Math2D {
         Core.subtract(srcMat, new Scalar(scalar), dstMat);
     }
 
+    public void sub(Buffer2D a, Buffer2D b, Buffer2D dest) {
+        Mat aMat = matFromBuffer2D(a);
+        Mat bMat = matFromBuffer2D(b);
+        Mat dstMat = matFromBuffer2D(dest);
+        Core.subtract(aMat, bMat, dstMat, Mat.ones(dstMat.size(), CvType.CV_8U), dstMat.depth());
+    }
+
     public void mul(Buffer2D src, double scalar, Buffer2D dst) {
         Mat srcMat = matFromBuffer2D(src);
         Mat dstMat = matFromBuffer2D(dst);
